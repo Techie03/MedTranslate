@@ -545,25 +545,69 @@ export default function App() {
     try {
       const client = FHIR.client("https://launch.smarthealthit.org/v/r4/fhir");
       
-      setStep("Querying Patient ID: 87a339d0-8cae-418e-89c7-8651e6aab3c6...");
+      setStep("Fetching patient record...");
       const patient = await client.request("Patient/87a339d0-8cae-418e-89c7-8651e6aab3c6");
-      
-      setStep("Querying DocumentReference & Medications...");
-      const ehrText = `
-EHR Import for: ${patient.name?.[0]?.given?.join(" ")} ${patient.name?.[0]?.family}
-Gender: ${patient.gender} | BirthDate: ${patient.birthDate}
+      const name = `${patient.name?.[0]?.given?.join(" ") || "Unknown"} ${patient.name?.[0]?.family || ""}`.trim();
 
-Discharge Summary:
-Reason for Visit: Viral illness and dehydration.
-Hospital Course: Patient received IV fluids and rested. Recovered well.
-Discharge Medications:
-1. Ibuprofen 400mg - Take 1 tablet twice a day with food.
-2. Ondansetron 4mg - Take 1 tablet every 8 hours as needed for nausea.
-Follow-up Appointments:
-- General Practice in 2 weeks.
-      `;
-      
-      setFile(null); // Clear any uploaded file so we process as text
+      setStep("Querying Conditions...");
+      let conditionsText = "";
+      try {
+        const cBundle = await client.request("Condition?patient=87a339d0-8cae-418e-89c7-8651e6aab3c6&_count=20");
+        const entries = cBundle.entry || [];
+        if (entries.length > 0) {
+          conditionsText = "Active Conditions:\n" + entries.map((e, i) => {
+            const c = e.resource;
+            const display = c.code?.coding?.[0]?.display || c.code?.text || "Unknown";
+            const status = c.clinicalStatus?.coding?.[0]?.code || "unknown";
+            const onset = c.onsetDateTime || "";
+            return `${i+1}. ${display} (Status: ${status}${onset ? ", Onset: " + onset.slice(0,10) : ""})`;
+          }).join("\n");
+        }
+      } catch(e) { console.warn("Conditions query failed:", e); }
+
+      setStep("Querying Medications...");
+      let medsText = "";
+      try {
+        const mBundle = await client.request("MedicationRequest?patient=87a339d0-8cae-418e-89c7-8651e6aab3c6&_count=20");
+        const entries = mBundle.entry || [];
+        if (entries.length > 0) {
+          medsText = "Medications:\n" + entries.map((e, i) => {
+            const m = e.resource;
+            const drug = m.medicationCodeableConcept?.coding?.[0]?.display || m.medicationCodeableConcept?.text || "Unknown medication";
+            const dosage = m.dosageInstruction?.[0]?.text || "";
+            const status = m.status || "";
+            return `${i+1}. ${drug}${dosage ? " — " + dosage : ""}${status ? " (Status: " + status + ")" : ""}`;
+          }).join("\n");
+        }
+      } catch(e) { console.warn("MedicationRequest query failed:", e); }
+
+      setStep("Querying Observations...");
+      let obsText = "";
+      try {
+        const oBundle = await client.request("Observation?patient=87a339d0-8cae-418e-89c7-8651e6aab3c6&category=laboratory&_count=15&_sort=-date");
+        const entries = oBundle.entry || [];
+        if (entries.length > 0) {
+          obsText = "Recent Lab Results:\n" + entries.map((e, i) => {
+            const o = e.resource;
+            const test = o.code?.coding?.[0]?.display || o.code?.text || "Unknown test";
+            const val = o.valueQuantity ? `${o.valueQuantity.value} ${o.valueQuantity.unit || ""}` : (o.valueString || "N/A");
+            const ref = o.referenceRange?.[0] ? `(Ref: ${o.referenceRange[0].low?.value || ""}–${o.referenceRange[0].high?.value || ""} ${o.referenceRange[0].low?.unit || ""})` : "";
+            const date = o.effectiveDateTime ? o.effectiveDateTime.slice(0,10) : "";
+            return `${i+1}. ${test}: ${val} ${ref} ${date ? "[" + date + "]" : ""}`;
+          }).join("\n");
+        }
+      } catch(e) { console.warn("Observations query failed:", e); }
+
+      const ehrText = `EHR Import — Patient: ${name}
+Gender: ${patient.gender || "N/A"} | DOB: ${patient.birthDate || "N/A"}
+
+${conditionsText || "No conditions found."}
+
+${medsText || "No medications found."}
+
+${obsText || "No lab results found."}`;
+
+      setFile(null);
       setReportText(ehrText);
       analyze(ehrText);
     } catch (e) {
