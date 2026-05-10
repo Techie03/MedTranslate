@@ -116,6 +116,29 @@ Keep everything simple — words a grandparent would understand. Be warm and rea
 If not a medical document: {"error":"not_medical","message":"This doesn't look like a medical report. Please upload a lab result, blood test, or health report."}
 If text is unclear: {"error":"unclear","message":"We couldn't read this clearly. Please try pasting the text directly instead."}`;
 
+const SAFETY_SYSTEM_PROMPT = `You are the Medical Safety Sentinel.
+Your job is to act as a secondary safety validation layer for a medical translation system.
+Evaluate the translated JSON output for any internal contradictions or explicitly dangerous language.
+CRITICAL CHECKS:
+1. Dosage alterations (e.g., 10mg changed to 100mg)
+2. Allergy inversions (e.g., 'allergic to penicillin' translated as 'penicillin works')
+3. Negation errors (e.g., 'no fever' translated as 'fever')
+4. Critical condition mistranslations
+
+Respond with ONLY a single valid JSON object — no markdown fences, no preamble:
+{
+  "safety_score": 95,
+  "is_safe": true,
+  "flags": [
+    {
+      "severity": "critical" | "warning",
+      "issue": "Description of the error",
+      "recommendation": "Suggested action"
+    }
+  ]
+}
+If there are no issues, return an empty flags array. Always assign a safety_score (0-100).`;
+
 const getChatSystemPrompt = (report, lang) => {
   const langInfo = LANGUAGES.find(l => l.code === lang);
   const langName = langInfo ? `${langInfo.label} (${langInfo.native})` : "English";
@@ -277,6 +300,7 @@ export default function App() {
   const [analyzing, setAnalyzing]     = useState(false);
   const [analyzingStep, setStep]      = useState("");
   const [reportData, setReport]       = useState(null);
+  const [safetyData, setSafety]       = useState(null);
   const [error, setError]             = useState(null);
   const [tab, setTab]                 = useState("findings");
   const [chatMsgs, setChatMsgs]       = useState([]);
@@ -411,6 +435,21 @@ export default function App() {
         setAnalyzing(false); setStep(""); return;
       }
 
+      setStep("Running Medical Safety Sentinel validation…");
+      const safetyMessages = [
+        ...messages,
+        { role: "assistant", content: "Translation completed: " + JSON.stringify(result) },
+        { role: "user", content: "Please run the Medical Safety Sentinel checks on this translation." }
+      ];
+      let safetyResult = { safety_score: 100, is_safe: true, flags: [] };
+      try {
+        const safetyRaw = await callGroq(safetyMessages, SAFETY_SYSTEM_PROMPT);
+        safetyResult = JSON.parse(safetyRaw.replace(/```json|```/g, "").trim());
+      } catch (err) {
+        console.error("Safety Sentinel Error:", err);
+      }
+      setSafety(safetyResult);
+
       setReport(result); setChatMsgs([]); setPage("results"); setTab("findings");
     } catch (e) {
       if (e.message.includes("JSON")) {
@@ -462,7 +501,7 @@ export default function App() {
   };
 
   const reset = () => {
-    setPage("home"); setReport(null); setTranslated(null);
+    setPage("home"); setReport(null); setTranslated(null); setSafety(null);
     setFile(null); setReportText(""); setError(null);
     setChatMsgs([]); setChatInput(""); setTab("findings");
   };
@@ -490,7 +529,7 @@ export default function App() {
       <main style={{ position: "relative", zIndex: 1 }}>
         {page === "home"
           ? <HomePage selectedFile={selectedFile} setFile={setFile} reportText={reportText} setReportText={setReportText} inputMode={inputMode} setInputMode={setInputMode} dragOver={dragOver} setDragOver={setDragOver} analyzing={analyzing} analyzingStep={analyzingStep} error={error} setError={setError} fileRef={fileRef} handleDrop={handleDrop} analyze={analyze} highContrast={hc} />
-          : <ResultsPage r={display} tab={tab} setTab={setTab} chatMsgs={chatMsgs} chatInput={chatInput} setChatInput={setChatInput} chatLoading={chatLoading} sendChat={sendChat} chatEndRef={chatEndRef} chatPdf={chatPdf} setChatPdf={setChatPdf} chatPdfRef={chatPdfRef} detectedLang={detectedLang} setDetectedLang={setDetected} copied={copied} copyText={copyText} highContrast={hc} translating={translating} />
+          : <ResultsPage r={display} safetyData={safetyData} tab={tab} setTab={setTab} chatMsgs={chatMsgs} chatInput={chatInput} setChatInput={setChatInput} chatLoading={chatLoading} sendChat={sendChat} chatEndRef={chatEndRef} chatPdf={chatPdf} setChatPdf={setChatPdf} chatPdfRef={chatPdfRef} detectedLang={detectedLang} setDetectedLang={setDetected} copied={copied} copyText={copyText} highContrast={hc} translating={translating} />
         }
       </main>
     </div>
@@ -738,7 +777,7 @@ function DropZone({ selectedFile, setFile, dragOver, setDragOver, fileRef, handl
 // ─────────────────────────────────────────────────────────────
 // RESULTS PAGE
 // ─────────────────────────────────────────────────────────────
-function ResultsPage({ r, tab, setTab, chatMsgs, chatInput, setChatInput, chatLoading, sendChat, chatEndRef, chatPdf, setChatPdf, chatPdfRef, detectedLang, setDetectedLang, copied, copyText, highContrast, translating }) {
+function ResultsPage({ r, safetyData, tab, setTab, chatMsgs, chatInput, setChatInput, chatLoading, sendChat, chatEndRef, chatPdf, setChatPdf, chatPdfRef, detectedLang, setDetectedLang, copied, copyText, highContrast, translating }) {
   const hc      = highContrast;
   const confPct = { high:96, medium:64, low:32 }[r.confidence] || 65;
   const tabs    = [
@@ -757,14 +796,28 @@ function ResultsPage({ r, tab, setTab, chatMsgs, chatInput, setChatInput, chatLo
             <h2 style={{ fontFamily: "Lora,serif", fontSize: "clamp(1.5rem,4vw,2rem)", fontWeight: 600, letterSpacing: "-0.01em", marginBottom: 5, color: hc ? "#fff" : "#1a1a2e" }}>{r.report_type}</h2>
             {r.report_date && <div style={{ color: "#94a3b8", fontSize: 13 }}>📅 {r.report_date}</div>}
           </div>
-          <div style={{ background: hc ? "#111" : "#fff", border: `1px solid ${hc ? "#444" : "rgba(99,102,241,0.12)"}`, borderRadius: 16, padding: "14px 18px", minWidth: 180 }}>
-            <div style={{ fontSize: 10.5, color: "#94a3b8", textTransform: "uppercase", letterSpacing: 1.5, marginBottom: 8, fontWeight: 600 }}>How sure are we?</div>
-            <div style={{ height: 6, background: "rgba(99,102,241,0.1)", borderRadius: 99, marginBottom: 8, overflow: "hidden" }}>
-              <div style={{ height: "100%", width: confPct+"%", background: "linear-gradient(90deg,#6366f1,#8b5cf6)", borderRadius: 99, transition: "width 1.2s ease 0.4s" }} />
+          <div style={{ display: "flex", gap: 12, flexDirection: "column" }}>
+            <div style={{ background: hc ? "#111" : "#fff", border: `1px solid ${hc ? "#444" : "rgba(99,102,241,0.12)"}`, borderRadius: 16, padding: "14px 18px", minWidth: 200 }}>
+              <div style={{ fontSize: 10.5, color: "#94a3b8", textTransform: "uppercase", letterSpacing: 1.5, marginBottom: 8, fontWeight: 600 }}>Translation Confidence</div>
+              <div style={{ height: 6, background: "rgba(99,102,241,0.1)", borderRadius: 99, marginBottom: 8, overflow: "hidden" }}>
+                <div style={{ height: "100%", width: confPct+"%", background: "linear-gradient(90deg,#6366f1,#8b5cf6)", borderRadius: 99, transition: "width 1.2s ease 0.4s" }} />
+              </div>
+              <div style={{ fontSize: 12, fontWeight: 700, color: r.confidence==="high" ? "#22c55e" : r.confidence==="medium" ? "#f59e0b" : "#ef4444" }}>
+                {r.confidence==="high" ? "High — very reliable" : "Medium — verify with doctor"}
+              </div>
             </div>
-            <div style={{ fontSize: 12, fontWeight: 700, color: r.confidence==="high" ? "#22c55e" : r.confidence==="medium" ? "#f59e0b" : "#ef4444" }}>
-              {r.confidence==="high" ? "High — very reliable" : "Medium — verify with doctor"}
-            </div>
+
+            {safetyData && (
+              <div style={{ background: safetyData.is_safe ? "rgba(34,197,94,0.06)" : "rgba(239,68,68,0.06)", border: `1px solid ${safetyData.is_safe ? "rgba(34,197,94,0.3)" : "rgba(239,68,68,0.3)"}`, borderRadius: 16, padding: "14px 18px", minWidth: 200 }}>
+                <div style={{ fontSize: 10.5, color: safetyData.is_safe ? "#16a34a" : "#dc2626", textTransform: "uppercase", letterSpacing: 1.5, marginBottom: 8, fontWeight: 700 }}>Medical Safety Sentinel</div>
+                <div style={{ height: 6, background: safetyData.is_safe ? "rgba(34,197,94,0.2)" : "rgba(239,68,68,0.2)", borderRadius: 99, marginBottom: 8, overflow: "hidden" }}>
+                  <div style={{ height: "100%", width: (safetyData.safety_score||100)+"%", background: safetyData.is_safe ? "#22c55e" : "#ef4444", borderRadius: 99, transition: "width 1.2s ease 0.4s" }} />
+                </div>
+                <div style={{ fontSize: 12, fontWeight: 700, color: safetyData.is_safe ? "#16a34a" : "#dc2626" }}>
+                  {safetyData.is_safe ? `Score: ${safetyData.safety_score} - Clinically Safe` : `Score: ${safetyData.safety_score} - Safety Warning!`}
+                </div>
+              </div>
+            )}
           </div>
         </div>
 
@@ -774,11 +827,32 @@ function ResultsPage({ r, tab, setTab, chatMsgs, chatInput, setChatInput, chatLo
         </div>
 
         {r.abnormal_summary && (
-          <div style={{ background: "rgba(245,158,11,0.06)", border: "1.5px solid rgba(245,158,11,0.25)", borderRadius: 14, padding: "14px 20px", display: "flex", gap: 12, alignItems: "flex-start" }}>
+          <div style={{ background: "rgba(245,158,11,0.06)", border: "1.5px solid rgba(245,158,11,0.25)", borderRadius: 14, padding: "14px 20px", display: "flex", gap: 12, alignItems: "flex-start", marginBottom: 14 }}>
             <span style={{ fontSize: 22, flexShrink: 0 }}>⚠️</span>
             <div>
               <div style={{ fontWeight: 700, fontSize: 13, color: "#d97706", marginBottom: 4, textTransform: "uppercase", letterSpacing: 0.8 }}>Something to note</div>
               <div style={{ color: hc ? "#eee" : "#78716c", fontSize: 13.5, lineHeight: 1.75 }}>{translating ? <SkeletonLine /> : r.abnormal_summary}</div>
+            </div>
+          </div>
+        )}
+
+        {safetyData && safetyData.flags && safetyData.flags.length > 0 && (
+          <div className="pop-in" style={{ background: "rgba(239,68,68,0.07)", border: "1.5px solid rgba(239,68,68,0.4)", borderRadius: 14, padding: "16px 20px", marginBottom: 14 }}>
+            <div style={{ fontWeight: 700, fontSize: 14, color: "#dc2626", marginBottom: 10, display: "flex", alignItems: "center", gap: 8 }}>
+              <span style={{ fontSize: 18 }}>🚨</span> Clinical Safety Alerts Detected
+            </div>
+            <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+              {safetyData.flags.map((flag, i) => (
+                <div key={i} style={{ background: hc ? "#1a1a1a" : "#fff", borderRadius: 10, padding: "12px 16px", borderLeft: `4px solid ${flag.severity === "critical" ? "#ef4444" : "#f59e0b"}` }}>
+                  <div style={{ fontWeight: 600, fontSize: 13, color: hc ? "#fff" : "#1a1a2e", marginBottom: 4 }}>
+                    <span style={{ textTransform: "uppercase", fontSize: 10, background: flag.severity === "critical" ? "rgba(239,68,68,0.1)" : "rgba(245,158,11,0.1)", color: flag.severity === "critical" ? "#dc2626" : "#d97706", padding: "2px 6px", borderRadius: 4, marginRight: 8 }}>
+                      {flag.severity}
+                    </span>
+                    {flag.issue}
+                  </div>
+                  <div style={{ fontSize: 12, color: "#64748b" }}>{flag.recommendation}</div>
+                </div>
+              ))}
             </div>
           </div>
         )}
