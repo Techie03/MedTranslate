@@ -337,7 +337,7 @@ export default function App() {
   const [chatInput, setChatInput]     = useState("");
   const [chatLoading, setChatLoad]    = useState(false);
   const [chatPdf, setChatPdf]         = useState(null);
-  const [detectedLang, setDetected]   = useState(null);
+  const [detectedLang, setDetectedLang] = useState(null);
   const [lang, setLang]               = useState("en");
   const [translating, setTranslating] = useState(false);
   const [translatedData, setTranslated] = useState(null);
@@ -1405,19 +1405,32 @@ function Spinner({ size=18, color="#6366f1" }) {
 }
 
 // ─────────────────────────────────────────────────────────────
-// VOICE PAGE
+// VOICE PAGE — AI Doctor + Patient Translator
 // ─────────────────────────────────────────────────────────────
 function VoicePage({ lang, highContrast, onExit }) {
   const hc = highContrast;
   const [msgs, setMsgs] = useState([]);
-  const [recordingSpeaker, setRecordingSpeaker] = useState(null); // 'doctor' | 'patient'
+  const [isRecording, setIsRecording] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [patientInput, setPatientInput] = useState("");
   const mediaRecorderRef = useRef(null);
   const chunksRef = useRef([]);
+  const endRef = useRef(null);
 
-  const langInfo = LANGUAGES.find(l => l.code === lang) || LANGUAGES[0];
+  useEffect(() => { endRef.current?.scrollIntoView({ behavior: "smooth" }); }, [msgs]);
 
-  const startRecording = async (speaker) => {
+  const AI_DOCTOR_PROMPT = `You are MedTranslate AI Doctor — a warm, empathetic medical assistant helping a patient who may speak any language. 
+
+RULES:
+- Give helpful, reassuring medical guidance
+- NEVER give a definitive diagnosis — always say "this could be..." or "you should see a doctor about..."
+- Keep answers to 2-3 short paragraphs
+- Use simple, plain language a 12-year-old could understand
+- If the patient describes an emergency (chest pain, can't breathe, stroke symptoms), tell them to call emergency services IMMEDIATELY
+- Always end with a caring note
+- Respond in the SAME LANGUAGE the patient used. If they speak Telugu, respond in Telugu. If Hindi, respond in Hindi. If English, respond in English.`;
+
+  const startRecording = async () => {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       mediaRecorderRef.current = new MediaRecorder(stream);
@@ -1425,57 +1438,68 @@ function VoicePage({ lang, highContrast, onExit }) {
       mediaRecorderRef.current.ondataavailable = e => chunksRef.current.push(e.data);
       mediaRecorderRef.current.onstop = async () => {
         stream.getTracks().forEach(t => t.stop());
-        handleStop(speaker);
+        processVoice();
       };
       mediaRecorderRef.current.start();
-      setRecordingSpeaker(speaker);
+      setIsRecording(true);
     } catch (err) {
-      alert("Could not access microphone. Please check permissions.");
+      alert("Microphone access denied. Please allow microphone permissions.");
     }
   };
 
   const stopRecording = () => {
     if (mediaRecorderRef.current && mediaRecorderRef.current.state === "recording") {
       mediaRecorderRef.current.stop();
-      setRecordingSpeaker(null);
+      setIsRecording(false);
     }
   };
 
-  const handleStop = async (speaker) => {
+  const processVoice = async () => {
     if (chunksRef.current.length === 0) return;
     setIsProcessing(true);
     try {
-      const blob = new Blob(chunksRef.current, { type: 'audio/webm' });
-      const originalText = await transcribeAudio(blob);
-      if (!originalText || originalText.trim().length < 2) { setIsProcessing(false); return; }
-
-      let translatedText = "";
-      if (speaker === "doctor") {
-        if (lang !== "en") {
-          translatedText = await translateText(originalText, lang);
-          speakText(translatedText, lang);
-        }
-      } else {
-        if (lang !== "en") {
-          const resp = await callGroq([{ role: "user", content: `Translate to English. Return ONLY translated text:\n\n${originalText}` }], "You are a medical translator.");
-          translatedText = resp.trim();
-          speakText(translatedText, "en");
-        }
-      }
-
-      setMsgs(prev => [...prev, { speaker, originalText, translatedText, id: Date.now() }]);
+      const blob = new Blob(chunksRef.current, { type: "audio/webm" });
+      const text = await transcribeAudio(blob);
+      if (!text || text.trim().length < 2) { setIsProcessing(false); return; }
+      await sendToAIDoctor(text.trim());
     } catch (e) {
       console.error(e);
-      alert("Audio processing failed: " + e.message);
+      setMsgs(prev => [...prev, { role: "system", content: "Audio error: " + e.message, id: Date.now() }]);
     }
     setIsProcessing(false);
   };
 
-  const speakText = (text, languageCode) => {
+  const sendToAIDoctor = async (text) => {
+    const patientMsg = { role: "patient", content: text, id: Date.now() };
+    setMsgs(prev => [...prev, patientMsg]);
+    setIsProcessing(true);
+    try {
+      const history = msgs.filter(m => m.role !== "system").map(m => ({
+        role: m.role === "patient" ? "user" : "assistant",
+        content: m.content,
+      }));
+      history.push({ role: "user", content: text });
+      const reply = await callGroq(history, AI_DOCTOR_PROMPT);
+      const doctorMsg = { role: "doctor", content: reply.trim(), id: Date.now() + 1 };
+      setMsgs(prev => [...prev, doctorMsg]);
+      speakText(reply.trim());
+    } catch (e) {
+      setMsgs(prev => [...prev, { role: "system", content: "Error: " + e.message, id: Date.now() + 1 }]);
+    }
+    setIsProcessing(false);
+  };
+
+  const handleTextSend = () => {
+    if (!patientInput.trim()) return;
+    sendToAIDoctor(patientInput.trim());
+    setPatientInput("");
+  };
+
+  const speakText = (text) => {
     if (!window.speechSynthesis) return;
-    const utterance = new SpeechSynthesisUtterance(text);
-    utterance.lang = languageCode === 'en' ? 'en-US' : languageCode; 
-    window.speechSynthesis.speak(utterance);
+    const u = new SpeechSynthesisUtterance(text);
+    u.rate = 0.95;
+    window.speechSynthesis.speak(u);
   };
 
   return (
@@ -1483,63 +1507,103 @@ function VoicePage({ lang, highContrast, onExit }) {
       <button onClick={onExit} style={{ background: "transparent", border: "none", color: "#6366f1", cursor: "pointer", fontWeight: 700, marginBottom: 20, display: "flex", alignItems: "center", gap: 5 }}>
         <span style={{ fontSize: 18 }}>←</span> Back to Reports
       </button>
-      
+
       <div style={{ textAlign: "center", marginBottom: 30 }}>
-        <div style={{ display: "inline-block", background: "rgba(239,68,68,0.1)", color: "#ef4444", padding: "4px 12px", borderRadius: 20, fontSize: 12, fontWeight: 700, marginBottom: 12, letterSpacing: 1, textTransform: "uppercase" }}>
-          <span style={{ display: "inline-block", width: 8, height: 8, background: "#ef4444", borderRadius: "50%", marginRight: 6, animation: "pulse 1.5s infinite" }}></span> Live Mode
+        <div style={{ display: "inline-block", background: "rgba(34,197,94,0.1)", color: "#22c55e", padding: "4px 12px", borderRadius: 20, fontSize: 12, fontWeight: 700, marginBottom: 12, letterSpacing: 1, textTransform: "uppercase" }}>
+          <span style={{ display: "inline-block", width: 8, height: 8, background: "#22c55e", borderRadius: "50%", marginRight: 6, animation: "pulse 1.5s infinite" }}></span> AI Doctor Active
         </div>
-        <h2 style={{ fontFamily: "Lora,serif", fontSize: "clamp(1.5rem,4vw,2.2rem)", color: hc ? "#fff" : "#1a1a2e", marginBottom: 10 }}>Clinical Conversation</h2>
-        <p style={{ color: "#64748b", fontSize: 14 }}>Real-time voice translation between English and {langInfo.label}</p>
+        <h2 style={{ fontFamily: "Lora,serif", fontSize: "clamp(1.5rem,4vw,2rem)", color: hc ? "#fff" : "#1a1a2e", marginBottom: 8 }}>AI Doctor — Patient Translator</h2>
+        <p style={{ color: "#64748b", fontSize: 14, lineHeight: 1.6 }}>Speak or type in <strong>any language</strong> — Telugu, Hindi, English, Arabic, Spanish…<br/>The AI Doctor understands and responds in your language.</p>
+        <div style={{ marginTop: 10, background: "rgba(239,68,68,0.08)", border: "1px solid rgba(239,68,68,0.2)", borderRadius: 10, padding: "8px 14px", display: "inline-block", fontSize: 12, color: "#dc2626", fontWeight: 600 }}>⚠️ Not a real doctor · For guidance only · Call 911 for emergencies</div>
       </div>
 
-      <div style={{ display: "flex", gap: 16, marginBottom: 40, justifyContent: "center" }}>
-        <button 
-          onMouseDown={() => startRecording("doctor")} onMouseUp={stopRecording} onMouseLeave={stopRecording}
-          onTouchStart={(e) => { e.preventDefault(); startRecording("doctor"); }} onTouchEnd={(e) => { e.preventDefault(); stopRecording(); }}
-          style={{ flex: 1, maxWidth: 240, padding: "24px 16px", borderRadius: 24, border: recordingSpeaker === "doctor" ? "4px solid #ef4444" : `4px solid ${hc ? "#333" : "#e2e8f0"}`, background: recordingSpeaker === "doctor" ? "rgba(239,68,68,0.1)" : (hc ? "#111" : "#fff"), color: hc ? "#fff" : "#1a1a2e", cursor: "pointer", transition: "all 0.2s", boxShadow: recordingSpeaker === "doctor" ? "0 0 20px rgba(239,68,68,0.2)" : "none" }}>
-          <div style={{ fontSize: 32, marginBottom: 8, animation: recordingSpeaker === "doctor" ? "float 1s infinite" : "none" }}>👨‍⚕️</div>
-          <div style={{ fontWeight: 700, fontSize: 16, color: recordingSpeaker === "doctor" ? "#ef4444" : (hc ? "#fff" : "#1a1a2e") }}>{recordingSpeaker === "doctor" ? "Listening..." : "Hold to Speak"}</div>
-          <div style={{ fontSize: 12, color: "#64748b", marginTop: 6, fontWeight: 600 }}>DOCTOR (English)</div>
-        </button>
-
-        <button 
-          onMouseDown={() => startRecording("patient")} onMouseUp={stopRecording} onMouseLeave={stopRecording}
-          onTouchStart={(e) => { e.preventDefault(); startRecording("patient"); }} onTouchEnd={(e) => { e.preventDefault(); stopRecording(); }}
-          style={{ flex: 1, maxWidth: 240, padding: "24px 16px", borderRadius: 24, border: recordingSpeaker === "patient" ? "4px solid #ef4444" : `4px solid ${hc ? "#333" : "#e2e8f0"}`, background: recordingSpeaker === "patient" ? "rgba(239,68,68,0.1)" : (hc ? "#111" : "#fff"), color: hc ? "#fff" : "#1a1a2e", cursor: "pointer", transition: "all 0.2s", boxShadow: recordingSpeaker === "patient" ? "0 0 20px rgba(239,68,68,0.2)" : "none" }}>
-          <div style={{ fontSize: 32, marginBottom: 8, animation: recordingSpeaker === "patient" ? "float 1s infinite" : "none" }}>{langInfo.flag}</div>
-          <div style={{ fontWeight: 700, fontSize: 16, color: recordingSpeaker === "patient" ? "#ef4444" : (hc ? "#fff" : "#1a1a2e") }}>{recordingSpeaker === "patient" ? "Listening..." : "Hold to Speak"}</div>
-          <div style={{ fontSize: 12, color: "#64748b", marginTop: 6, fontWeight: 600, textTransform: "uppercase" }}>PATIENT ({langInfo.label})</div>
-        </button>
-      </div>
-
-      {isProcessing && (
-        <div style={{ textAlign: "center", marginBottom: 30, display: "flex", alignItems: "center", justifyContent: "center", gap: 10 }}>
-          <Spinner size={16} color="#6366f1" />
-          <span style={{ color: "#6366f1", fontWeight: 600, fontSize: 14 }}>Translating & generating audio...</span>
-        </div>
-      )}
-
-      <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-        {msgs.map((m, i) => (
-          <div key={m.id} className="fu0" style={{ alignSelf: m.speaker === "doctor" ? "flex-start" : "flex-end", maxWidth: "85%", background: m.speaker === "doctor" ? (hc ? "#1a1a2a" : "#f1f5f9") : (hc ? "#1a2a1a" : "#f0fdf4"), border: `1px solid ${m.speaker === "doctor" ? (hc ? "#334" : "#e2e8f0") : (hc ? "#242" : "#bbf7d0")}`, borderRadius: 24, borderBottomLeftRadius: m.speaker === "doctor" ? 4 : 24, borderBottomRightRadius: m.speaker === "patient" ? 4 : 24, padding: "16px 20px", animationDelay: `${Math.min(i*0.1, 0.5)}s` }}>
-            <div style={{ fontSize: 11, color: "#64748b", textTransform: "uppercase", letterSpacing: 1, marginBottom: 6, fontWeight: 700, display: "flex", alignItems: "center", gap: 6 }}>
-              {m.speaker === "doctor" ? "👨‍⚕️ Doctor" : `${langInfo.flag} Patient`}
-            </div>
-            <div style={{ fontSize: 15, color: hc ? "#bbb" : "#475569", marginBottom: 8, fontStyle: "italic" }}>"{m.originalText}"</div>
-            {m.translatedText && (
-              <div style={{ fontSize: 16, color: hc ? "#fff" : "#0f172a", fontWeight: 600, borderTop: `1px solid ${hc ? "#333" : "rgba(0,0,0,0.06)"}`, paddingTop: 10 }}>
-                {m.translatedText}
-              </div>
-            )}
-          </div>
-        ))}
+      {/* Chat Messages */}
+      <div style={{ minHeight: 200, maxHeight: 400, overflowY: "auto", marginBottom: 20, padding: 4 }}>
         {msgs.length === 0 && !isProcessing && (
-          <div style={{ textAlign: "center", padding: "40px 20px", color: "#94a3b8", background: hc ? "#111" : "rgba(255,255,255,0.5)", borderRadius: 20, border: `1px dashed ${hc ? "#333" : "#cbd5e1"}` }}>
-            <div style={{ fontSize: 32, marginBottom: 10 }}>🎙️</div>
-            <p>Hold one of the buttons above to start talking.</p>
+          <div style={{ textAlign: "center", padding: "50px 20px", color: "#94a3b8", background: hc ? "#111" : "rgba(255,255,255,0.5)", borderRadius: 20, border: `1px dashed ${hc ? "#333" : "#cbd5e1"}` }}>
+            <div style={{ fontSize: 48, marginBottom: 12 }}>🩺</div>
+            <p style={{ fontSize: 15, fontWeight: 600, marginBottom: 6 }}>How can I help you today?</p>
+            <p style={{ fontSize: 13 }}>Speak or type your symptoms in any language</p>
           </div>
         )}
+        <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+          {msgs.map(m => (
+            <div key={m.id} style={{ alignSelf: m.role === "patient" ? "flex-end" : "flex-start", maxWidth: "85%", background: m.role === "patient" ? (hc ? "#1a2a1a" : "#f0fdf4") : m.role === "system" ? (hc ? "#2a1a1a" : "#fef2f2") : (hc ? "#1a1a2a" : "#f1f5f9"), border: `1px solid ${m.role === "patient" ? (hc ? "#242" : "#bbf7d0") : m.role === "system" ? "#fca5a5" : (hc ? "#334" : "#e2e8f0")}`, borderRadius: 20, padding: "14px 18px" }}>
+              <div style={{ fontSize: 11, color: "#64748b", textTransform: "uppercase", letterSpacing: 1, marginBottom: 6, fontWeight: 700 }}>
+                {m.role === "patient" ? "🗣️ You" : m.role === "system" ? "⚠️ System" : "🩺 AI Doctor"}
+              </div>
+              <div style={{ fontSize: 15, color: hc ? "#eee" : "#1a1a2e", lineHeight: 1.7, whiteSpace: "pre-wrap" }}>{m.content}</div>
+            </div>
+          ))}
+          {isProcessing && (
+            <div style={{ alignSelf: "flex-start", maxWidth: "85%", background: hc ? "#1a1a2a" : "#f1f5f9", border: `1px solid ${hc ? "#334" : "#e2e8f0"}`, borderRadius: 20, padding: "14px 18px", display: "flex", alignItems: "center", gap: 10 }}>
+              <Spinner size={16} color="#6366f1" />
+              <span style={{ color: "#6366f1", fontWeight: 600, fontSize: 14 }}>AI Doctor is thinking...</span>
+            </div>
+          )}
+        </div>
+        <div ref={endRef} />
+      </div>
+
+      {/* Voice + Text Input */}
+      <div style={{ position: "fixed", bottom: 0, left: 0, right: 0, background: hc ? "#000" : "#fff", borderTop: `1px solid ${hc ? "#333" : "#e2e8f0"}`, padding: "16px", zIndex: 10 }}>
+        <div style={{ maxWidth: 800, margin: "0 auto", display: "flex", gap: 10, alignItems: "center" }}>
+          <button onClick={isRecording ? stopRecording : startRecording} disabled={isProcessing} style={{ width: 52, height: 52, borderRadius: "50%", border: "none", background: isRecording ? "#ef4444" : "#22c55e", color: "#fff", fontSize: 22, cursor: isProcessing ? "wait" : "pointer", flexShrink: 0, boxShadow: isRecording ? "0 0 20px rgba(239,68,68,0.4)" : "0 4px 14px rgba(34,197,94,0.3)", transition: "all 0.2s", animation: isRecording ? "pulse 1s infinite" : "none" }}>
+            {isRecording ? "⏹" : "🎙️"}
+          </button>
+          <input type="text" value={patientInput} onChange={e => setPatientInput(e.target.value)} onKeyDown={e => e.key === "Enter" && handleTextSend()} placeholder="Or type here in any language..." disabled={isProcessing} style={{ flex: 1, padding: "14px 18px", borderRadius: 14, border: `1.5px solid ${hc ? "#444" : "#e2e8f0"}`, background: hc ? "#111" : "#f8fafc", color: hc ? "#fff" : "#1a1a2e", fontSize: 15, outline: "none" }} />
+          <button onClick={handleTextSend} disabled={isProcessing || !patientInput.trim()} style={{ padding: "14px 20px", borderRadius: 14, border: "none", background: "#6366f1", color: "#fff", fontWeight: 700, cursor: "pointer", opacity: (!patientInput.trim() || isProcessing) ? 0.5 : 1 }}>Send</button>
+        </div>
       </div>
     </div>
   );
 }
+
+// ─────────────────────────────────────────────────────────────
+// OFFLINE EMERGENCY PAGE
+// ─────────────────────────────────────────────────────────────
+function OfflinePage({ lang, highContrast, onExit }) {
+  const hc = highContrast;
+  const phrases = [
+    { en: "I am having chest pain.", te: "నాకు ఛాతీలో నొప్పిగా ఉంది.", hi: "मुझे सीने में दर्द हो रहा है।", ar: "أشعر بألم في صدري.", es: "Tengo dolor en el pecho." },
+    { en: "I cannot breathe.", te: "నేను ఊపిరి పీల్చుకోలేకపోతున్నాను.", hi: "मुझे सांस लेने में तकलीफ हो रही है।", ar: "لا أستطيع التنفس.", es: "No puedo respirar." },
+    { en: "I am allergic to penicillin.", te: "నాకు పెన్సిలిన్ ఎలర్జీ ఉంది.", hi: "मुझे पेनिसिलिन से एलर्जी है।", ar: "لديّ حساسية من البنسلين.", es: "Soy alérgico a la penicilina." },
+    { en: "I need an ambulance.", te: "నాకు అంబులెన్స్ కావాలి.", hi: "मुझे एम्बुलेंस चाहिए।", ar: "أحتاج سيارة إسعاف.", es: "Necesito una ambulancia." },
+    { en: "I take blood thinners.", te: "నేను బ్లడ్ థిన్నర్స్ వాడుతున్నాను.", hi: "मैं ब्लड थिनर लेता हूँ।", ar: "أتناول مميعات الدم.", es: "Tomo anticoagulantes." },
+    { en: "I have diabetes.", te: "నాకు డయాబెటిస్ ఉంది.", hi: "मुझे मधुमेह है।", ar: "لديّ مرض السكري.", es: "Tengo diabetes." },
+    { en: "Where does it hurt?", te: "నొప్పి ఎక్కడ ఉంది?", hi: "दर्द कहाँ हो रहा है?", ar: "أين يؤلمك؟", es: "¿Dónde le duele?" },
+  ];
+
+  return (
+    <div className="scale-in" style={{ maxWidth: 800, margin: "0 auto", padding: "20px 16px", minHeight: "100vh" }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 30, paddingBottom: 20, borderBottom: `1px solid ${hc ? "#333" : "#e2e8f0"}` }}>
+        <button onClick={onExit} style={{ background: "none", border: "none", color: hc ? "#fff" : "#475569", fontSize: 15, fontWeight: 600, cursor: "pointer", display: "flex", alignItems: "center", gap: 6 }}>
+          <span>←</span> Back to Main
+        </button>
+        <div style={{ background: "#dc2626", color: "#fff", padding: "6px 12px", borderRadius: 8, fontSize: 13, fontWeight: 700, display: "flex", alignItems: "center", gap: 6 }}>
+          🚨 OFFLINE MODE
+        </div>
+      </div>
+      <div style={{ marginBottom: 30 }}>
+        <h2 style={{ fontSize: 24, fontWeight: 700, marginBottom: 8, color: hc ? "#fff" : "#1a1a2e" }}>Emergency Phrasebook</h2>
+        <p style={{ color: hc ? "#aaa" : "#64748b", fontSize: 15 }}>Critical medical phrases — works without internet.</p>
+      </div>
+      <div style={{ display: "grid", gap: 16 }}>
+        {phrases.map((p, i) => (
+          <div key={i} style={{ border: `1px solid ${hc ? "#333" : "#e2e8f0"}`, borderRadius: 12, padding: "20px", background: hc ? "#111" : "#f8fafc" }}>
+            <div style={{ fontSize: 18, fontWeight: 700, marginBottom: 12, color: hc ? "#fff" : "#0f172a" }}>{p.en}</div>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(180px, 1fr))", gap: 10 }}>
+              {[{code:"te",label:"Telugu"},{code:"hi",label:"Hindi"},{code:"ar",label:"Arabic"},{code:"es",label:"Spanish"}].map(l => (
+                <div key={l.code} style={{ background: hc ? "#1a1a1a" : "#fff", padding: "10px", borderRadius: 8, border: `1px solid ${hc ? "#222" : "#e2e8f0"}` }}>
+                  <div style={{ fontSize: 10, color: "#64748b", textTransform: "uppercase", letterSpacing: 1, marginBottom: 4, fontWeight: 700 }}>{l.label}</div>
+                  <div style={{ fontSize: 15, color: "#6366f1", fontWeight: 600 }}>{p[l.code]}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
