@@ -145,6 +145,10 @@ async function callGroq(messages, systemPrompt) {
   if (!GROQ_API_KEY || GROQ_API_KEY === "gsk_your_groq_api_key_here") {
     throw new Error("Please open src/App.jsx and set your Groq API key in the GROQ_API_KEY constant at the top of the file. Get a free key at console.groq.com");
   }
+  
+  const hasImage = messages.some(m => Array.isArray(m.content) && m.content.some(c => c.type === "image_url"));
+  const modelToUse = hasImage ? "llama-3.2-90b-vision-preview" : MODEL;
+
   const response = await fetch(GROQ_API_URL, {
     method: "POST",
     headers: {
@@ -152,7 +156,7 @@ async function callGroq(messages, systemPrompt) {
       "Authorization": `Bearer ${GROQ_API_KEY}`,
     },
     body: JSON.stringify({
-      model: MODEL,
+      model: modelToUse,
       max_tokens: 4096,
       temperature: 0.3,
       messages: [{ role: "system", content: systemPrompt }, ...messages],
@@ -196,6 +200,21 @@ async function extractPdfText(file) {
     fullText += `\n--- Page ${i} ---\n${content.items.map(item => item.str).join(" ")}`;
   }
   return fullText.trim();
+}
+
+async function pdfToImageUrl(file) {
+  const pdfjsLib = window.pdfjsLib;
+  if (!pdfjsLib) throw new Error("PDF reader not loaded.");
+  const arrayBuffer = await file.arrayBuffer();
+  const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+  const page = await pdf.getPage(1); // Read first page for visual analysis
+  const viewport = page.getViewport({ scale: 2.0 });
+  const canvas = document.createElement("canvas");
+  const ctx = canvas.getContext("2d");
+  canvas.width = viewport.width;
+  canvas.height = viewport.height;
+  await page.render({ canvasContext: ctx, viewport }).promise;
+  return canvas.toDataURL("image/jpeg", 0.9);
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -353,10 +372,18 @@ export default function App() {
             setAnalyzing(false); setStep(""); return;
           }
           if (!pdfText || pdfText.length < 30) {
-            setError({ title: "PDF appears empty", msg: "This PDF has no readable text. It may be a scanned image — please take a photo and upload it instead." });
-            setAnalyzing(false); setStep(""); return;
+            setStep("Detecting handwritten or scanned text…");
+            const dataUrl = await pdfToImageUrl(selectedFile);
+            messages = [{
+              role: "user",
+              content: [
+                { type: "image_url", image_url: { url: dataUrl } },
+                { type: "text", text: "Carefully analyze this scanned or handwritten medical report and return the JSON translation. Pay special attention to handwritten notes." },
+              ],
+            }];
+          } else {
+            messages = [{ role: "user", content: `Analyze this medical report (extracted from PDF) and return the JSON translation:\n\n${pdfText}` }];
           }
-          messages = [{ role: "user", content: `Analyze this medical report (extracted from PDF) and return the JSON translation:\n\n${pdfText}` }];
 
         } else if (selectedFile.type.startsWith("image/")) {
           setStep("Reading your report image…");
@@ -365,7 +392,7 @@ export default function App() {
             role: "user",
             content: [
               { type: "image_url", image_url: { url: dataUrl } },
-              { type: "text", text: "Analyze this medical report image and return the JSON translation. It may be in any language including Telugu, Hindi, Tamil, or English." },
+              { type: "text", text: "Carefully analyze this image containing a medical report (which may be handwritten) and return the JSON translation. Pay special attention to handwritten notes." },
             ],
           }];
         } else {
