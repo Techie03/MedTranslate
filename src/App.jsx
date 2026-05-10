@@ -795,7 +795,7 @@ function HomePage({ selectedFile, setFile, reportText, setReportText, inputMode,
           <span style={{ fontSize: 10, background: "rgba(99,102,241,0.1)", color: "#6366f1", padding: "4px 8px", borderRadius: 6, fontWeight: 700, textTransform: "uppercase" }}>Prototype</span>
         </div>
         <button onClick={onEpicLogin} disabled={analyzing} style={{ width: "100%", background: hc ? "#111" : "#fff", border: `1.5px solid ${hc ? "#444" : "#e2e8f0"}`, borderRadius: 14, padding: "16px", display: "flex", alignItems: "center", justifyContent: "center", gap: 12, cursor: analyzing ? "wait" : "pointer", transition: "all 0.2s" }} onMouseOver={e=>e.currentTarget.style.borderColor="#6366f1"} onMouseOut={e=>e.currentTarget.style.borderColor=(hc ? "#444" : "#e2e8f0")}>
-          <img src="https://upload.wikimedia.org/wikipedia/commons/thumb/c/c5/Epic_Systems_logo.svg/200px-Epic_Systems_logo.svg.png" alt="Epic Logo" style={{ height: 24, filter: hc ? "brightness(0) invert(1)" : "none" }} />
+          <span style={{ fontWeight: 900, fontSize: 20, color: "#e11d48", letterSpacing: -1, fontFamily: "Arial Black, sans-serif" }}>Epic</span>
           <span style={{ fontWeight: 600, fontSize: 14, color: hc ? "#fff" : "#1a1a2e" }}>Connect to Epic EHR (Sandbox)</span>
         </button>
       </div>
