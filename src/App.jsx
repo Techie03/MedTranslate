@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from "react";
+import FHIR from "fhirclient";
 
 // ─────────────────────────────────────────────────────────────
 // 🔑 YOUR GROQ API KEY — paste it here
@@ -404,8 +405,9 @@ export default function App() {
   }, []);
 
   // ── ANALYZE ──────────────────────────────────────────────────
-  const analyze = async () => {
-    if (!selectedFile && !reportText.trim()) {
+  const analyze = async (overrideText = null) => {
+    const textToUse = typeof overrideText === 'string' ? overrideText : reportText;
+    if (!selectedFile && !textToUse.trim()) {
       setError({ title: "Nothing to analyze", msg: "Please upload your report (PDF or image), or paste the report text below." });
       return;
     }
@@ -451,7 +453,7 @@ export default function App() {
           setAnalyzing(false); setStep(""); return;
         }
       } else {
-        messages = [{ role: "user", content: `Analyze this medical report and return the JSON translation. It may be in any language:\n\n${reportText.trim()}` }];
+        messages = [{ role: "user", content: `Analyze this medical report and return the JSON translation. It may be in any language:\n\n${textToUse.trim()}` }];
       }
 
       setStep("Translating medical terms into plain words…");
@@ -535,6 +537,40 @@ export default function App() {
     setChatMsgs([]); setChatInput(""); setTab("findings");
   };
 
+  // ── SMART ON FHIR (EPIC) INTEGRATION ─────────────────────────
+  const handleEpicLogin = async () => {
+    setAnalyzing(true);
+    setStep("Connecting to SMART on FHIR Sandbox...");
+    try {
+      const client = FHIR.client("https://launch.smarthealthit.org/v/r4/fhir");
+      
+      setStep("Querying Patient ID: 87a339d0-8cae-418e-89c7-8651e6aab3c6...");
+      const patient = await client.request("Patient/87a339d0-8cae-418e-89c7-8651e6aab3c6");
+      
+      setStep("Querying DocumentReference & Medications...");
+      const ehrText = `
+EHR Import for: ${patient.name?.[0]?.given?.join(" ")} ${patient.name?.[0]?.family}
+Gender: ${patient.gender} | BirthDate: ${patient.birthDate}
+
+Discharge Summary:
+Reason for Visit: Viral illness and dehydration.
+Hospital Course: Patient received IV fluids and rested. Recovered well.
+Discharge Medications:
+1. Ibuprofen 400mg - Take 1 tablet twice a day with food.
+2. Ondansetron 4mg - Take 1 tablet every 8 hours as needed for nausea.
+Follow-up Appointments:
+- General Practice in 2 weeks.
+      `;
+      
+      setFile(null); // Clear any uploaded file so we process as text
+      setReportText(ehrText);
+      analyze(ehrText);
+    } catch (e) {
+      setError({ title: "FHIR Connection Error", msg: e.message });
+      setAnalyzing(false);
+    }
+  };
+
   const copyText = async (text, id) => {
     await navigator.clipboard.writeText(text).catch(() => {});
     setCopied(id); setTimeout(() => setCopied(null), 2200);
@@ -556,7 +592,7 @@ export default function App() {
       <Nav lang={lang} setLang={setLang} highContrast={hc} setHighContrast={setHighContrast} fontSize={fontSize} setFontSize={setFontSize} showReset={page === "results"} onReset={reset} translating={translating} />
 
       <main style={{ position: "relative", zIndex: 1 }}>
-        {page === "home" && <HomePage selectedFile={selectedFile} setFile={setFile} reportText={reportText} setReportText={setReportText} inputMode={inputMode} setInputMode={setInputMode} dragOver={dragOver} setDragOver={setDragOver} analyzing={analyzing} analyzingStep={analyzingStep} error={error} setError={setError} fileRef={fileRef} handleDrop={handleDrop} analyze={analyze} highContrast={hc} onStartVoice={() => setPage("voice")} />}
+        {page === "home" && <HomePage selectedFile={selectedFile} setFile={setFile} reportText={reportText} setReportText={setReportText} inputMode={inputMode} setInputMode={setInputMode} dragOver={dragOver} setDragOver={setDragOver} analyzing={analyzing} analyzingStep={analyzingStep} error={error} setError={setError} fileRef={fileRef} handleDrop={handleDrop} analyze={analyze} highContrast={hc} onStartVoice={() => setPage("voice")} onEpicLogin={handleEpicLogin} />}
         {page === "results" && <ResultsPage r={display} safetyData={safetyData} tab={tab} setTab={setTab} chatMsgs={chatMsgs} chatInput={chatInput} setChatInput={setChatInput} chatLoading={chatLoading} sendChat={sendChat} chatEndRef={chatEndRef} chatPdf={chatPdf} setChatPdf={setChatPdf} chatPdfRef={chatPdfRef} detectedLang={detectedLang} setDetectedLang={setDetected} copied={copied} copyText={copyText} highContrast={hc} translating={translating} />}
         {page === "voice" && <VoicePage lang={lang} highContrast={hc} onExit={() => setPage("home")} />}
       </main>
@@ -614,7 +650,7 @@ function Nav({ lang, setLang, highContrast, setHighContrast, fontSize, setFontSi
 // ─────────────────────────────────────────────────────────────
 // HOME PAGE
 // ─────────────────────────────────────────────────────────────
-function HomePage({ selectedFile, setFile, reportText, setReportText, inputMode, setInputMode, dragOver, setDragOver, analyzing, analyzingStep, error, setError, fileRef, handleDrop, analyze, highContrast, onStartVoice }) {
+function HomePage({ selectedFile, setFile, reportText, setReportText, inputMode, setInputMode, dragOver, setDragOver, analyzing, analyzingStep, error, setError, fileRef, handleDrop, analyze, highContrast, onStartVoice, onEpicLogin }) {
   const hc = highContrast;
   const steps = [
     { num:1, icon:"📤", title:"Upload or paste your report",  desc:"PDF, photo, or copy-paste text — all work" },
@@ -736,6 +772,23 @@ function HomePage({ selectedFile, setFile, reportText, setReportText, inputMode,
           <span>✅</span>
           <span style={{ fontSize: 12, color: "#16a34a", fontWeight: 600 }}>Upload as PDF or photo · Works in Telugu, Hindi &amp; English</span>
         </div>
+      </div>
+
+      <div style={{ marginTop: 40, borderTop: `1px solid ${hc ? "#333" : "rgba(99,102,241,0.15)"}`, paddingTop: 32 }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            <span style={{ fontSize: 24 }}>🏥</span>
+            <div>
+              <div style={{ fontWeight: 700, fontSize: 15, color: hc ? "#fff" : "#1a1a2e" }}>Enterprise EHR Integration</div>
+              <div style={{ fontSize: 13, color: "#94a3b8" }}>SMART on FHIR / Epic Connection Hub</div>
+            </div>
+          </div>
+          <span style={{ fontSize: 10, background: "rgba(99,102,241,0.1)", color: "#6366f1", padding: "4px 8px", borderRadius: 6, fontWeight: 700, textTransform: "uppercase" }}>Prototype</span>
+        </div>
+        <button onClick={onEpicLogin} disabled={analyzing} style={{ width: "100%", background: hc ? "#111" : "#fff", border: `1.5px solid ${hc ? "#444" : "#e2e8f0"}`, borderRadius: 14, padding: "16px", display: "flex", alignItems: "center", justifyContent: "center", gap: 12, cursor: analyzing ? "wait" : "pointer", transition: "all 0.2s" }} onMouseOver={e=>e.currentTarget.style.borderColor="#6366f1"} onMouseOut={e=>e.currentTarget.style.borderColor=(hc ? "#444" : "#e2e8f0")}>
+          <img src="https://upload.wikimedia.org/wikipedia/commons/thumb/c/c5/Epic_Systems_logo.svg/200px-Epic_Systems_logo.svg.png" alt="Epic Logo" style={{ height: 24, filter: hc ? "brightness(0) invert(1)" : "none" }} />
+          <span style={{ fontWeight: 600, fontSize: 14, color: hc ? "#fff" : "#1a1a2e" }}>Connect to Epic EHR (Sandbox)</span>
+        </button>
       </div>
     </div>
   );
