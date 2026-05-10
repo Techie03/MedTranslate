@@ -147,7 +147,7 @@ async function callGroq(messages, systemPrompt) {
   }
   
   const hasImage = messages.some(m => Array.isArray(m.content) && m.content.some(c => c.type === "image_url"));
-  const modelToUse = hasImage ? "llama-3.2-90b-vision-preview" : MODEL;
+  const modelToUse = hasImage ? "llama-3.2-11b-vision-preview" : MODEL;
 
   const response = await fetch(GROQ_API_URL, {
     method: "POST",
