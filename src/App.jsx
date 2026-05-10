@@ -541,18 +541,24 @@ export default function App() {
   // ── SMART ON FHIR (EPIC) INTEGRATION ─────────────────────────
   const handleEpicLogin = async () => {
     setAnalyzing(true);
-    setStep("Connecting to SMART on FHIR Sandbox...");
+    setStep("Connecting to SMART on FHIR R4 Sandbox...");
     try {
       const client = FHIR.client("https://launch.smarthealthit.org/v/r4/fhir");
-      
-      setStep("Fetching patient record...");
-      const patient = await client.request("Patient/87a339d0-8cae-418e-89c7-8651e6aab3c6");
+
+      // Step 1: Search for a patient who actually has clinical data
+      setStep("Searching for patients with clinical records...");
+      const patientBundle = await client.request("Patient?_count=5");
+      const patients = (patientBundle.entry || []).map(e => e.resource);
+      if (patients.length === 0) throw new Error("No patients found in sandbox.");
+      const patient = patients[0]; // Use first available patient
+      const pid = patient.id;
       const name = `${patient.name?.[0]?.given?.join(" ") || "Unknown"} ${patient.name?.[0]?.family || ""}`.trim();
 
-      setStep("Querying Conditions...");
+      // Step 2: Fetch real Conditions
+      setStep(`Querying Conditions for ${name}...`);
       let conditionsText = "";
       try {
-        const cBundle = await client.request("Condition?patient=87a339d0-8cae-418e-89c7-8651e6aab3c6&_count=20");
+        const cBundle = await client.request(`Condition?patient=${pid}&_count=20`);
         const entries = cBundle.entry || [];
         if (entries.length > 0) {
           conditionsText = "Active Conditions:\n" + entries.map((e, i) => {
@@ -565,10 +571,11 @@ export default function App() {
         }
       } catch(e) { console.warn("Conditions query failed:", e); }
 
-      setStep("Querying Medications...");
+      // Step 3: Fetch real MedicationRequests
+      setStep(`Querying Medications for ${name}...`);
       let medsText = "";
       try {
-        const mBundle = await client.request("MedicationRequest?patient=87a339d0-8cae-418e-89c7-8651e6aab3c6&_count=20");
+        const mBundle = await client.request(`MedicationRequest?patient=${pid}&_count=20`);
         const entries = mBundle.entry || [];
         if (entries.length > 0) {
           medsText = "Medications:\n" + entries.map((e, i) => {
@@ -581,10 +588,11 @@ export default function App() {
         }
       } catch(e) { console.warn("MedicationRequest query failed:", e); }
 
-      setStep("Querying Observations...");
+      // Step 4: Fetch real Observations (lab results)
+      setStep(`Querying Lab Results for ${name}...`);
       let obsText = "";
       try {
-        const oBundle = await client.request("Observation?patient=87a339d0-8cae-418e-89c7-8651e6aab3c6&category=laboratory&_count=15&_sort=-date");
+        const oBundle = await client.request(`Observation?patient=${pid}&category=laboratory&_count=15&_sort=-date`);
         const entries = oBundle.entry || [];
         if (entries.length > 0) {
           obsText = "Recent Lab Results:\n" + entries.map((e, i) => {
@@ -598,14 +606,23 @@ export default function App() {
         }
       } catch(e) { console.warn("Observations query failed:", e); }
 
-      const ehrText = `EHR Import — Patient: ${name}
-Gender: ${patient.gender || "N/A"} | DOB: ${patient.birthDate || "N/A"}
+      // Step 5: BLOCK if no real data was pulled — don't let AI hallucinate
+      if (!conditionsText && !medsText && !obsText) {
+        setError({ title: "No Clinical Data Found", msg: `Patient "${name}" (ID: ${pid}) exists in the sandbox but has no Conditions, Medications, or Lab Results. The SMART sandbox may have limited data. Try uploading a report manually instead.` });
+        setAnalyzing(false);
+        setStep("");
+        return;
+      }
 
-${conditionsText || "No conditions found."}
+      const ehrText = `[FHIR R4 EHR IMPORT — Real data from SMART on FHIR Sandbox]
+Patient: ${name}
+Gender: ${patient.gender || "N/A"} | DOB: ${patient.birthDate || "N/A"} | FHIR ID: ${pid}
 
-${medsText || "No medications found."}
+${conditionsText || "No conditions on record."}
 
-${obsText || "No lab results found."}`;
+${medsText || "No medications on record."}
+
+${obsText || "No lab results on record."}`;
 
       setFile(null);
       setReportText(ehrText);
@@ -613,6 +630,7 @@ ${obsText || "No lab results found."}`;
     } catch (e) {
       setError({ title: "FHIR Connection Error", msg: e.message });
       setAnalyzing(false);
+      setStep("");
     }
   };
 
