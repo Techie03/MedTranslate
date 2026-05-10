@@ -105,6 +105,12 @@ Respond with ONLY a single valid JSON object — no markdown fences, no preamble
     }
   ],
   "abnormal_summary": "string or null",
+  "discharge_summary": {
+    "reason_for_visit": "string or null",
+    "hospital_course": "string or null — plain English what happened",
+    "discharge_medications": [{"name": "string", "instructions": "string", "purpose": "string", "schedule_codes": ["array of exact strings: 'morning', 'afternoon', 'night', 'food', 'water', '1x', '2x', '3x' — omit if none apply"]}],
+    "follow_up_appointments": [{"who": "string", "when": "string", "purpose": "string"}]
+  },
   "doctor_questions": ["3-5 plain English questions to ask the doctor"],
   "watch_for_symptoms": [{"symptom": "string", "reason": "string"}],
   "lifestyle_notes": ["2-4 simple lifestyle tips"],
@@ -190,6 +196,28 @@ async function callGroq(messages, systemPrompt) {
   }
   const data = await response.json();
   return data.choices[0].message.content;
+}
+
+async function transcribeAudio(audioBlob) {
+  if (!GROQ_API_KEY || GROQ_API_KEY === "gsk_your_groq_api_key_here") {
+    throw new Error("Please set your Groq API key.");
+  }
+  const formData = new FormData();
+  formData.append("file", audioBlob, "audio.webm");
+  formData.append("model", "whisper-large-v3-turbo");
+  formData.append("response_format", "json");
+
+  const response = await fetch("https://api.groq.com/openai/v1/audio/transcriptions", {
+    method: "POST",
+    headers: { "Authorization": `Bearer ${GROQ_API_KEY}` },
+    body: formData,
+  });
+  if (!response.ok) {
+    const err = await response.json().catch(() => ({}));
+    throw new Error(err.error?.message || `Groq Audio error ${response.status}`);
+  }
+  const data = await response.json();
+  return data.text;
 }
 
 async function translateText(text, targetLang) {
@@ -450,7 +478,8 @@ export default function App() {
       }
       setSafety(safetyResult);
 
-      setReport(result); setChatMsgs([]); setPage("results"); setTab("findings");
+      setReport(result); setChatMsgs([]); setPage("results"); 
+      setTab(result.discharge_summary ? "discharge" : "findings");
     } catch (e) {
       if (e.message.includes("JSON")) {
         setError({ title: "Could not read the report", msg: "We had trouble reading this. Please try the 'Paste Text' option instead." });
@@ -527,10 +556,9 @@ export default function App() {
       <Nav lang={lang} setLang={setLang} highContrast={hc} setHighContrast={setHighContrast} fontSize={fontSize} setFontSize={setFontSize} showReset={page === "results"} onReset={reset} translating={translating} />
 
       <main style={{ position: "relative", zIndex: 1 }}>
-        {page === "home"
-          ? <HomePage selectedFile={selectedFile} setFile={setFile} reportText={reportText} setReportText={setReportText} inputMode={inputMode} setInputMode={setInputMode} dragOver={dragOver} setDragOver={setDragOver} analyzing={analyzing} analyzingStep={analyzingStep} error={error} setError={setError} fileRef={fileRef} handleDrop={handleDrop} analyze={analyze} highContrast={hc} />
-          : <ResultsPage r={display} safetyData={safetyData} tab={tab} setTab={setTab} chatMsgs={chatMsgs} chatInput={chatInput} setChatInput={setChatInput} chatLoading={chatLoading} sendChat={sendChat} chatEndRef={chatEndRef} chatPdf={chatPdf} setChatPdf={setChatPdf} chatPdfRef={chatPdfRef} detectedLang={detectedLang} setDetectedLang={setDetected} copied={copied} copyText={copyText} highContrast={hc} translating={translating} />
-        }
+        {page === "home" && <HomePage selectedFile={selectedFile} setFile={setFile} reportText={reportText} setReportText={setReportText} inputMode={inputMode} setInputMode={setInputMode} dragOver={dragOver} setDragOver={setDragOver} analyzing={analyzing} analyzingStep={analyzingStep} error={error} setError={setError} fileRef={fileRef} handleDrop={handleDrop} analyze={analyze} highContrast={hc} onStartVoice={() => setPage("voice")} />}
+        {page === "results" && <ResultsPage r={display} safetyData={safetyData} tab={tab} setTab={setTab} chatMsgs={chatMsgs} chatInput={chatInput} setChatInput={setChatInput} chatLoading={chatLoading} sendChat={sendChat} chatEndRef={chatEndRef} chatPdf={chatPdf} setChatPdf={setChatPdf} chatPdfRef={chatPdfRef} detectedLang={detectedLang} setDetectedLang={setDetected} copied={copied} copyText={copyText} highContrast={hc} translating={translating} />}
+        {page === "voice" && <VoicePage lang={lang} highContrast={hc} onExit={() => setPage("home")} />}
       </main>
     </div>
   );
@@ -586,7 +614,7 @@ function Nav({ lang, setLang, highContrast, setHighContrast, fontSize, setFontSi
 // ─────────────────────────────────────────────────────────────
 // HOME PAGE
 // ─────────────────────────────────────────────────────────────
-function HomePage({ selectedFile, setFile, reportText, setReportText, inputMode, setInputMode, dragOver, setDragOver, analyzing, analyzingStep, error, setError, fileRef, handleDrop, analyze, highContrast }) {
+function HomePage({ selectedFile, setFile, reportText, setReportText, inputMode, setInputMode, dragOver, setDragOver, analyzing, analyzingStep, error, setError, fileRef, handleDrop, analyze, highContrast, onStartVoice }) {
   const hc = highContrast;
   const steps = [
     { num:1, icon:"📤", title:"Upload or paste your report",  desc:"PDF, photo, or copy-paste text — all work" },
@@ -688,6 +716,15 @@ function HomePage({ selectedFile, setFile, reportText, setReportText, inputMode,
         <span style={{ color: "#6366f1", fontWeight: 600 }}>📑 PDF · 🖼️ Image · 📝 Pasted text — all accepted</span>
       </p>
 
+      <div className="fu6" style={{ marginTop: 24, textAlign: "center" }}>
+        <div style={{ background: hc ? "#111" : "rgba(34,197,94,0.06)", border: `1px solid ${hc ? "#444" : "rgba(34,197,94,0.2)"}`, borderRadius: 16, padding: "20px" }}>
+          <div style={{ fontSize: 13, fontWeight: 700, color: hc ? "#fff" : "#16a34a", marginBottom: 6 }}>Talking to your doctor right now?</div>
+          <button onClick={onStartVoice} style={{ background: "#22c55e", color: "#fff", border: "none", borderRadius: 12, padding: "12px 24px", fontSize: 14, fontWeight: 700, cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 8, boxShadow: "0 4px 14px rgba(34,197,94,0.3)", transition: "transform 0.2s" }} onMouseOver={e=>e.currentTarget.style.transform="scale(1.02)"} onMouseOut={e=>e.currentTarget.style.transform="scale(1)"}>
+            🎙️ Start Live Voice Translation
+          </button>
+        </div>
+      </div>
+
       <div style={{ marginTop: 28, textAlign: "center" }}>
         <div style={{ fontSize: 11, color: "#94a3b8", marginBottom: 10, letterSpacing: 1, textTransform: "uppercase", fontWeight: 600 }}>Works with any of these reports</div>
         <div style={{ display: "flex", gap: 7, justifyContent: "center", flexWrap: "wrap" }}>
@@ -781,7 +818,8 @@ function ResultsPage({ r, safetyData, tab, setTab, chatMsgs, chatInput, setChatI
   const hc      = highContrast;
   const confPct = { high:96, medium:64, low:32 }[r.confidence] || 65;
   const tabs    = [
-    { id:"findings",  icon:"🔬", label:"My Results",   count:(r.findings||[]).length },
+    ...(r.discharge_summary ? [{ id:"discharge", icon:"🏥", label:"Discharge Summary", count:null }] : []),
+    ...((r.findings||[]).length > 0 || !r.discharge_summary ? [{ id:"findings",  icon:"🔬", label:"My Results", count:(r.findings||[]).length }] : []),
     { id:"questions", icon:"💬", label:"Ask Doctor",   count:null },
     { id:"symptoms",  icon:"👀", label:"Watch For",    count:null },
     { id:"chat",      icon:"🤖", label:"Chat with AI", count:null },
@@ -869,6 +907,7 @@ function ResultsPage({ r, safetyData, tab, setTab, chatMsgs, chatInput, setChatI
         ))}
       </div>
 
+      {tab==="discharge" && <DischargePanel ds={r.discharge_summary} translating={translating} highContrast={hc} />}
       {tab==="findings"  && <FindingsPanel  findings={r.findings||[]} translating={translating} highContrast={hc} />}
       {tab==="questions" && <QuestionsPanel questions={r.doctor_questions||[]} copied={copied} copyText={copyText} translating={translating} highContrast={hc} />}
       {tab==="symptoms"  && <SymptomsPanel  symptoms={r.watch_for_symptoms||[]} lifestyle={r.lifestyle_notes||[]} translating={translating} highContrast={hc} />}
@@ -1148,6 +1187,96 @@ function ChatPanel({ msgs, input, setInput, loading, onSend, chatEndRef, highCon
 }
 
 // ─────────────────────────────────────────────────────────────
+// PICTOGRAM HELPER
+// ─────────────────────────────────────────────────────────────
+function renderPictograms(codes) {
+  if (!codes || !Array.isArray(codes) || codes.length === 0) return null;
+  const iconMap = {
+    "morning": { icon: "☀️", label: "Morning" },
+    "afternoon": { icon: "🌤️", label: "Afternoon" },
+    "night": { icon: "🌙", label: "Night" },
+    "food": { icon: "🍳", label: "With Food" },
+    "water": { icon: "💧", label: "With Water" },
+    "1x": { icon: "🔴", label: "1x/day" },
+    "2x": { icon: "🔴🔴", label: "2x/day" },
+    "3x": { icon: "🔴🔴🔴", label: "3x/day" }
+  };
+  return (
+    <div style={{ display: "flex", gap: 8, marginTop: 10, marginBottom: 4, flexWrap: "wrap" }}>
+      {codes.map((code, i) => {
+        const ic = iconMap[code];
+        if (!ic) return null;
+        return (
+          <span key={i} style={{ background: "rgba(99,102,241,0.08)", border: "1px solid rgba(99,102,241,0.2)", borderRadius: 8, padding: "4px 8px", fontSize: 13, display: "inline-flex", alignItems: "center", gap: 5, color: "#6366f1", fontWeight: 600 }}>
+            <span style={{ fontSize: 16 }}>{ic.icon}</span> {ic.label}
+          </span>
+        );
+      })}
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────
+// DISCHARGE PANEL
+// ─────────────────────────────────────────────────────────────
+function DischargePanel({ ds, translating, highContrast }) {
+  const hc = highContrast;
+  if (!ds) return null;
+  return (
+    <div className="scale-in">
+      {ds.reason_for_visit && (
+        <div style={{ marginBottom: 20 }}>
+          <h3 style={{ fontSize: 16, color: hc ? "#fff" : "#1a1a2e", marginBottom: 8, display: "flex", alignItems: "center", gap: 8 }}><span>🎯</span> Reason for Visit</h3>
+          <div style={{ background: hc ? "#111" : "#fff", border: `1px solid ${hc ? "#333" : "rgba(99,102,241,0.1)"}`, borderRadius: 12, padding: "16px", color: hc ? "#ddd" : "#475569", lineHeight: 1.6 }}>
+            {translating ? <SkeletonLine /> : ds.reason_for_visit}
+          </div>
+        </div>
+      )}
+      {ds.hospital_course && (
+        <div style={{ marginBottom: 20 }}>
+          <h3 style={{ fontSize: 16, color: hc ? "#fff" : "#1a1a2e", marginBottom: 8, display: "flex", alignItems: "center", gap: 8 }}><span>🏥</span> What Happened in Hospital</h3>
+          <div style={{ background: hc ? "#111" : "#fff", border: `1px solid ${hc ? "#333" : "rgba(99,102,241,0.1)"}`, borderRadius: 12, padding: "16px", color: hc ? "#ddd" : "#475569", lineHeight: 1.6 }}>
+            {translating ? <SkeletonLine /> : ds.hospital_course}
+          </div>
+        </div>
+      )}
+      {ds.discharge_medications && ds.discharge_medications.length > 0 && (
+        <div style={{ marginBottom: 20 }}>
+          <h3 style={{ fontSize: 16, color: hc ? "#fff" : "#1a1a2e", marginBottom: 8, display: "flex", alignItems: "center", gap: 8 }}><span>💊</span> Discharge Medications</h3>
+          <div style={{ display: "grid", gap: 12 }}>
+            {ds.discharge_medications.map((m, i) => (
+              <div key={i} style={{ background: hc ? "#111" : "#fff", border: `1px solid ${hc ? "#333" : "rgba(99,102,241,0.1)"}`, borderRadius: 12, padding: "16px" }}>
+                <div style={{ fontWeight: 700, color: hc ? "#fff" : "#1a1a2e", fontSize: 15, marginBottom: 4 }}>{translating ? <SkeletonLine /> : m.name}</div>
+                <div style={{ fontSize: 14, color: hc ? "#bbb" : "#475569", marginBottom: 8 }}>{translating ? <SkeletonLine /> : m.instructions}</div>
+                {!translating && renderPictograms(m.schedule_codes)}
+                <div style={{ fontSize: 12, color: "#6366f1", fontWeight: 600, background: "rgba(99,102,241,0.1)", display: "inline-block", padding: "4px 10px", borderRadius: 6, marginTop: 4 }}>{translating ? <SkeletonLine /> : m.purpose}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+      {ds.follow_up_appointments && ds.follow_up_appointments.length > 0 && (
+        <div style={{ marginBottom: 20 }}>
+          <h3 style={{ fontSize: 16, color: hc ? "#fff" : "#1a1a2e", marginBottom: 8, display: "flex", alignItems: "center", gap: 8 }}><span>📅</span> Follow-up Appointments</h3>
+          <div style={{ display: "grid", gap: 12 }}>
+            {ds.follow_up_appointments.map((a, i) => (
+              <div key={i} style={{ background: hc ? "#111" : "#fff", border: `1px solid ${hc ? "#333" : "rgba(99,102,241,0.1)"}`, borderRadius: 12, padding: "16px", display: "flex", alignItems: "flex-start", gap: 12 }}>
+                <div style={{ fontSize: 24 }}>📆</div>
+                <div>
+                  <div style={{ fontWeight: 700, color: hc ? "#fff" : "#1a1a2e", fontSize: 15, marginBottom: 4 }}>{translating ? <SkeletonLine /> : a.who}</div>
+                  <div style={{ fontSize: 14, color: "#22c55e", fontWeight: 600, marginBottom: 4 }}>{translating ? <SkeletonLine /> : a.when}</div>
+                  <div style={{ fontSize: 13, color: hc ? "#bbb" : "#64748b" }}>{translating ? <SkeletonLine /> : a.purpose}</div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────
 // EMPTY STATE + SPINNER
 // ─────────────────────────────────────────────────────────────
 function EmptyState({ icon, msg }) {
@@ -1156,4 +1285,144 @@ function EmptyState({ icon, msg }) {
 
 function Spinner({ size=18, color="#6366f1" }) {
   return <span style={{ width:size, height:size, border:`2px solid ${color}30`, borderTopColor:color, borderRadius:"50%", display:"inline-block", animation:"spin 0.7s linear infinite", flexShrink:0 }} />;
+}
+
+// ─────────────────────────────────────────────────────────────
+// VOICE PAGE
+// ─────────────────────────────────────────────────────────────
+function VoicePage({ lang, highContrast, onExit }) {
+  const hc = highContrast;
+  const [msgs, setMsgs] = useState([]);
+  const [recordingSpeaker, setRecordingSpeaker] = useState(null); // 'doctor' | 'patient'
+  const [isProcessing, setIsProcessing] = useState(false);
+  const mediaRecorderRef = useRef(null);
+  const chunksRef = useRef([]);
+
+  const langInfo = LANGUAGES.find(l => l.code === lang) || LANGUAGES[0];
+
+  const startRecording = async (speaker) => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      mediaRecorderRef.current = new MediaRecorder(stream);
+      chunksRef.current = [];
+      mediaRecorderRef.current.ondataavailable = e => chunksRef.current.push(e.data);
+      mediaRecorderRef.current.onstop = async () => {
+        stream.getTracks().forEach(t => t.stop());
+        handleStop(speaker);
+      };
+      mediaRecorderRef.current.start();
+      setRecordingSpeaker(speaker);
+    } catch (err) {
+      alert("Could not access microphone. Please check permissions.");
+    }
+  };
+
+  const stopRecording = () => {
+    if (mediaRecorderRef.current && mediaRecorderRef.current.state === "recording") {
+      mediaRecorderRef.current.stop();
+      setRecordingSpeaker(null);
+    }
+  };
+
+  const handleStop = async (speaker) => {
+    if (chunksRef.current.length === 0) return;
+    setIsProcessing(true);
+    try {
+      const blob = new Blob(chunksRef.current, { type: 'audio/webm' });
+      const originalText = await transcribeAudio(blob);
+      if (!originalText || originalText.trim().length < 2) { setIsProcessing(false); return; }
+
+      let translatedText = "";
+      if (speaker === "doctor") {
+        if (lang !== "en") {
+          translatedText = await translateText(originalText, lang);
+          speakText(translatedText, lang);
+        }
+      } else {
+        if (lang !== "en") {
+          const resp = await callGroq([{ role: "user", content: `Translate to English. Return ONLY translated text:\n\n${originalText}` }], "You are a medical translator.");
+          translatedText = resp.trim();
+          speakText(translatedText, "en");
+        }
+      }
+
+      setMsgs(prev => [...prev, { speaker, originalText, translatedText, id: Date.now() }]);
+    } catch (e) {
+      console.error(e);
+      alert("Audio processing failed: " + e.message);
+    }
+    setIsProcessing(false);
+  };
+
+  const speakText = (text, languageCode) => {
+    if (!window.speechSynthesis) return;
+    const utterance = new SpeechSynthesisUtterance(text);
+    utterance.lang = languageCode === 'en' ? 'en-US' : languageCode; 
+    window.speechSynthesis.speak(utterance);
+  };
+
+  return (
+    <div className="scale-in" style={{ maxWidth: 800, margin: "0 auto", padding: "28px 16px 80px" }}>
+      <button onClick={onExit} style={{ background: "transparent", border: "none", color: "#6366f1", cursor: "pointer", fontWeight: 700, marginBottom: 20, display: "flex", alignItems: "center", gap: 5 }}>
+        <span style={{ fontSize: 18 }}>←</span> Back to Reports
+      </button>
+      
+      <div style={{ textAlign: "center", marginBottom: 30 }}>
+        <div style={{ display: "inline-block", background: "rgba(239,68,68,0.1)", color: "#ef4444", padding: "4px 12px", borderRadius: 20, fontSize: 12, fontWeight: 700, marginBottom: 12, letterSpacing: 1, textTransform: "uppercase" }}>
+          <span style={{ display: "inline-block", width: 8, height: 8, background: "#ef4444", borderRadius: "50%", marginRight: 6, animation: "pulse 1.5s infinite" }}></span> Live Mode
+        </div>
+        <h2 style={{ fontFamily: "Lora,serif", fontSize: "clamp(1.5rem,4vw,2.2rem)", color: hc ? "#fff" : "#1a1a2e", marginBottom: 10 }}>Clinical Conversation</h2>
+        <p style={{ color: "#64748b", fontSize: 14 }}>Real-time voice translation between English and {langInfo.label}</p>
+      </div>
+
+      <div style={{ display: "flex", gap: 16, marginBottom: 40, justifyContent: "center" }}>
+        <button 
+          onMouseDown={() => startRecording("doctor")} onMouseUp={stopRecording} onMouseLeave={stopRecording}
+          onTouchStart={(e) => { e.preventDefault(); startRecording("doctor"); }} onTouchEnd={(e) => { e.preventDefault(); stopRecording(); }}
+          style={{ flex: 1, maxWidth: 240, padding: "24px 16px", borderRadius: 24, border: recordingSpeaker === "doctor" ? "4px solid #ef4444" : `4px solid ${hc ? "#333" : "#e2e8f0"}`, background: recordingSpeaker === "doctor" ? "rgba(239,68,68,0.1)" : (hc ? "#111" : "#fff"), color: hc ? "#fff" : "#1a1a2e", cursor: "pointer", transition: "all 0.2s", boxShadow: recordingSpeaker === "doctor" ? "0 0 20px rgba(239,68,68,0.2)" : "none" }}>
+          <div style={{ fontSize: 32, marginBottom: 8, animation: recordingSpeaker === "doctor" ? "float 1s infinite" : "none" }}>👨‍⚕️</div>
+          <div style={{ fontWeight: 700, fontSize: 16, color: recordingSpeaker === "doctor" ? "#ef4444" : (hc ? "#fff" : "#1a1a2e") }}>{recordingSpeaker === "doctor" ? "Listening..." : "Hold to Speak"}</div>
+          <div style={{ fontSize: 12, color: "#64748b", marginTop: 6, fontWeight: 600 }}>DOCTOR (English)</div>
+        </button>
+
+        <button 
+          onMouseDown={() => startRecording("patient")} onMouseUp={stopRecording} onMouseLeave={stopRecording}
+          onTouchStart={(e) => { e.preventDefault(); startRecording("patient"); }} onTouchEnd={(e) => { e.preventDefault(); stopRecording(); }}
+          style={{ flex: 1, maxWidth: 240, padding: "24px 16px", borderRadius: 24, border: recordingSpeaker === "patient" ? "4px solid #ef4444" : `4px solid ${hc ? "#333" : "#e2e8f0"}`, background: recordingSpeaker === "patient" ? "rgba(239,68,68,0.1)" : (hc ? "#111" : "#fff"), color: hc ? "#fff" : "#1a1a2e", cursor: "pointer", transition: "all 0.2s", boxShadow: recordingSpeaker === "patient" ? "0 0 20px rgba(239,68,68,0.2)" : "none" }}>
+          <div style={{ fontSize: 32, marginBottom: 8, animation: recordingSpeaker === "patient" ? "float 1s infinite" : "none" }}>{langInfo.flag}</div>
+          <div style={{ fontWeight: 700, fontSize: 16, color: recordingSpeaker === "patient" ? "#ef4444" : (hc ? "#fff" : "#1a1a2e") }}>{recordingSpeaker === "patient" ? "Listening..." : "Hold to Speak"}</div>
+          <div style={{ fontSize: 12, color: "#64748b", marginTop: 6, fontWeight: 600, textTransform: "uppercase" }}>PATIENT ({langInfo.label})</div>
+        </button>
+      </div>
+
+      {isProcessing && (
+        <div style={{ textAlign: "center", marginBottom: 30, display: "flex", alignItems: "center", justifyContent: "center", gap: 10 }}>
+          <Spinner size={16} color="#6366f1" />
+          <span style={{ color: "#6366f1", fontWeight: 600, fontSize: 14 }}>Translating & generating audio...</span>
+        </div>
+      )}
+
+      <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+        {msgs.map((m, i) => (
+          <div key={m.id} className="fu0" style={{ alignSelf: m.speaker === "doctor" ? "flex-start" : "flex-end", maxWidth: "85%", background: m.speaker === "doctor" ? (hc ? "#1a1a2a" : "#f1f5f9") : (hc ? "#1a2a1a" : "#f0fdf4"), border: `1px solid ${m.speaker === "doctor" ? (hc ? "#334" : "#e2e8f0") : (hc ? "#242" : "#bbf7d0")}`, borderRadius: 24, borderBottomLeftRadius: m.speaker === "doctor" ? 4 : 24, borderBottomRightRadius: m.speaker === "patient" ? 4 : 24, padding: "16px 20px", animationDelay: `${Math.min(i*0.1, 0.5)}s` }}>
+            <div style={{ fontSize: 11, color: "#64748b", textTransform: "uppercase", letterSpacing: 1, marginBottom: 6, fontWeight: 700, display: "flex", alignItems: "center", gap: 6 }}>
+              {m.speaker === "doctor" ? "👨‍⚕️ Doctor" : `${langInfo.flag} Patient`}
+            </div>
+            <div style={{ fontSize: 15, color: hc ? "#bbb" : "#475569", marginBottom: 8, fontStyle: "italic" }}>"{m.originalText}"</div>
+            {m.translatedText && (
+              <div style={{ fontSize: 16, color: hc ? "#fff" : "#0f172a", fontWeight: 600, borderTop: `1px solid ${hc ? "#333" : "rgba(0,0,0,0.06)"}`, paddingTop: 10 }}>
+                {m.translatedText}
+              </div>
+            )}
+          </div>
+        ))}
+        {msgs.length === 0 && !isProcessing && (
+          <div style={{ textAlign: "center", padding: "40px 20px", color: "#94a3b8", background: hc ? "#111" : "rgba(255,255,255,0.5)", borderRadius: 20, border: `1px dashed ${hc ? "#333" : "#cbd5e1"}` }}>
+            <div style={{ fontSize: 32, marginBottom: 10 }}>🎙️</div>
+            <p>Hold one of the buttons above to start talking.</p>
+          </div>
+        )}
+      </div>
+    </div>
+  );
 }
