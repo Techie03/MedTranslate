@@ -146,8 +146,7 @@ async function callGroq(messages, systemPrompt) {
     throw new Error("Please open src/App.jsx and set your Groq API key in the GROQ_API_KEY constant at the top of the file. Get a free key at console.groq.com");
   }
   
-  const hasImage = messages.some(m => Array.isArray(m.content) && m.content.some(c => c.type === "image_url"));
-  const modelToUse = hasImage ? "llama-3.2-11b-vision-preview" : MODEL;
+  const modelToUse = MODEL;
 
   const response = await fetch(GROQ_API_URL, {
     method: "POST",
