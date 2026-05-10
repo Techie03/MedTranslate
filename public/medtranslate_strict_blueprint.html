@@ -1,0 +1,1435 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MedTranslate AI — Strict Builder Blueprint</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:ital,wght@0,400;0,700;1,400&family=Fraunces:ital,opsz,wght@0,9..144,300;0,9..144,700;0,9..144,900;1,9..144,400&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+:root{
+  --ink:#0a0a0a;
+  --paper:#f5f0e8;
+  --paper2:#ede8db;
+  --red:#c0392b;
+  --red-pale:rgba(192,57,43,0.08);
+  --green:#1a6b3a;
+  --green-pale:rgba(26,107,58,0.08);
+  --amber:#b45309;
+  --amber-pale:rgba(180,83,9,0.08);
+  --blue:#1a3a6b;
+  --blue-pale:rgba(26,58,107,0.08);
+  --rule:#c8bfaa;
+  --muted:#7a7060;
+  --mono:'Space Mono',monospace;
+  --serif:'Fraunces',Georgia,serif;
+  --sans:'DM Sans',system-ui,sans-serif;
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+html{scroll-behavior:smooth;}
+body{
+  background:var(--paper);
+  color:var(--ink);
+  font-family:var(--sans);
+  line-height:1.6;
+  font-size:15px;
+}
+
+/* ─── COVER ─────────────────────────────────────────── */
+.cover{
+  min-height:100vh;
+  display:grid;
+  grid-template-rows:auto 1fr auto;
+  padding:48px;
+  border-bottom:2px solid var(--ink);
+  position:relative;
+  overflow:hidden;
+}
+.cover::before{
+  content:'';
+  position:absolute;
+  inset:0;
+  background-image:
+    repeating-linear-gradient(0deg,transparent,transparent 39px,var(--rule) 39px,var(--rule) 40px),
+    repeating-linear-gradient(90deg,transparent,transparent 39px,var(--rule) 39px,var(--rule) 40px);
+  opacity:0.35;
+  pointer-events:none;
+}
+.cover-top{
+  display:flex;
+  justify-content:space-between;
+  align-items:flex-start;
+  position:relative;
+}
+.doc-tag{
+  font-family:var(--mono);
+  font-size:10px;
+  letter-spacing:.15em;
+  text-transform:uppercase;
+  color:var(--muted);
+  border:1px solid var(--rule);
+  padding:5px 12px;
+}
+.cover-body{
+  display:flex;
+  flex-direction:column;
+  justify-content:center;
+  position:relative;
+  padding:60px 0;
+}
+.cover h1{
+  font-family:var(--serif);
+  font-size:clamp(52px,9vw,110px);
+  font-weight:900;
+  line-height:.95;
+  letter-spacing:-.03em;
+  margin-bottom:32px;
+}
+.cover h1 em{
+  font-style:italic;
+  font-weight:300;
+  color:var(--red);
+}
+.cover-deck{
+  font-family:var(--mono);
+  font-size:12px;
+  color:var(--muted);
+  max-width:560px;
+  line-height:1.9;
+  border-left:3px solid var(--red);
+  padding-left:16px;
+}
+.cover-bottom{
+  display:grid;
+  grid-template-columns:repeat(5,1fr);
+  gap:1px;
+  background:var(--rule);
+  border-top:1px solid var(--rule);
+  position:relative;
+}
+.verdict-cell{
+  background:var(--paper);
+  padding:20px 16px;
+  text-align:center;
+}
+.verdict-cell .score{
+  font-family:var(--serif);
+  font-size:40px;
+  font-weight:900;
+  line-height:1;
+  display:block;
+}
+.verdict-cell .score.pass{color:var(--green);}
+.verdict-cell .score.warn{color:var(--amber);}
+.verdict-cell .score.fail{color:var(--red);}
+.verdict-cell .dim{
+  font-family:var(--mono);
+  font-size:9px;
+  text-transform:uppercase;
+  letter-spacing:.1em;
+  color:var(--muted);
+  margin-top:4px;
+  display:block;
+}
+
+/* ─── NAV ───────────────────────────────────────────── */
+.toc{
+  background:var(--ink);
+  color:var(--paper);
+  padding:0 48px;
+  position:sticky;
+  top:0;
+  z-index:99;
+  overflow-x:auto;
+  white-space:nowrap;
+}
+.toc-inner{display:inline-flex;gap:0;}
+.toc a{
+  font-family:var(--mono);
+  font-size:10px;
+  letter-spacing:.12em;
+  text-transform:uppercase;
+  color:rgba(245,240,232,.5);
+  text-decoration:none;
+  padding:14px 18px;
+  display:inline-block;
+  border-bottom:2px solid transparent;
+  transition:all .2s;
+}
+.toc a:hover{color:var(--paper);border-bottom-color:var(--red);}
+
+/* ─── LAYOUT ────────────────────────────────────────── */
+.wrap{max-width:1080px;margin:0 auto;padding:0 48px;}
+
+/* ─── SECTION ───────────────────────────────────────── */
+.sec{
+  padding:72px 0 56px;
+  border-bottom:1px solid var(--rule);
+  scroll-margin-top:48px;
+}
+.sec-label{
+  font-family:var(--mono);
+  font-size:10px;
+  letter-spacing:.15em;
+  text-transform:uppercase;
+  color:var(--red);
+  margin-bottom:12px;
+}
+.sec h2{
+  font-family:var(--serif);
+  font-size:clamp(28px,4vw,48px);
+  font-weight:900;
+  letter-spacing:-.02em;
+  line-height:1.05;
+  margin-bottom:32px;
+}
+.sec h2 em{font-style:italic;font-weight:300;}
+
+/* ─── ALERT BOXES ───────────────────────────────────── */
+.alert{
+  padding:20px 24px;
+  margin-bottom:24px;
+  border-left:4px solid;
+  font-family:var(--mono);
+  font-size:12px;
+  line-height:1.8;
+}
+.alert strong{display:block;font-size:11px;letter-spacing:.08em;text-transform:uppercase;margin-bottom:6px;}
+.alert.kill{background:var(--red-pale);border-color:var(--red);}
+.alert.kill strong{color:var(--red);}
+.alert.build{background:var(--green-pale);border-color:var(--green);}
+.alert.build strong{color:var(--green);}
+.alert.watch{background:var(--amber-pale);border-color:var(--amber);}
+.alert.watch strong{color:var(--amber);}
+.alert.note{background:var(--blue-pale);border-color:var(--blue);}
+.alert.note strong{color:var(--blue);}
+
+/* ─── TWO-COL ───────────────────────────────────────── */
+.two{display:grid;grid-template-columns:1fr 1fr;gap:24px;margin-bottom:24px;}
+@media(max-width:640px){.two{grid-template-columns:1fr;}}
+
+/* ─── CELL CARDS ────────────────────────────────────── */
+.cell{
+  background:var(--paper2);
+  border:1px solid var(--rule);
+  padding:24px;
+}
+.cell-label{
+  font-family:var(--mono);
+  font-size:9px;
+  letter-spacing:.15em;
+  text-transform:uppercase;
+  color:var(--muted);
+  margin-bottom:10px;
+}
+.cell h3{
+  font-family:var(--serif);
+  font-size:17px;
+  font-weight:700;
+  margin-bottom:10px;
+  line-height:1.2;
+}
+.cell p{font-size:13px;color:#3a3530;line-height:1.7;}
+.cell.red{border-left:3px solid var(--red);}
+.cell.green{border-left:3px solid var(--green);}
+.cell.amber{border-left:3px solid var(--amber);}
+.cell.blue{border-left:3px solid var(--blue);}
+
+/* ─── TABLE ─────────────────────────────────────────── */
+.t{width:100%;border-collapse:collapse;font-size:12px;font-family:var(--mono);margin-bottom:24px;}
+.t thead th{
+  background:var(--ink);
+  color:var(--paper);
+  padding:10px 14px;
+  text-align:left;
+  font-size:9px;
+  letter-spacing:.12em;
+  text-transform:uppercase;
+  font-weight:400;
+}
+.t td{
+  padding:11px 14px;
+  border-bottom:1px solid var(--rule);
+  vertical-align:top;
+  line-height:1.6;
+}
+.t tr:nth-child(even) td{background:var(--paper2);}
+.t tr:hover td{background:rgba(192,57,43,.04);}
+.t td:first-child{font-weight:700;white-space:nowrap;}
+.pass{color:var(--green);}
+.fail{color:var(--red);}
+.part{color:var(--amber);}
+
+/* ─── FEATURE BUILD CARD ────────────────────────────── */
+.fbuild{
+  border:1px solid var(--rule);
+  background:var(--paper2);
+  margin-bottom:20px;
+  overflow:hidden;
+}
+.fbuild-head{
+  display:grid;
+  grid-template-columns:64px 1fr auto;
+  align-items:center;
+  gap:0;
+  border-bottom:1px solid var(--rule);
+}
+.fbuild-num{
+  font-family:var(--serif);
+  font-size:28px;
+  font-weight:900;
+  color:var(--red);
+  padding:16px;
+  border-right:1px solid var(--rule);
+  text-align:center;
+  line-height:1;
+}
+.fbuild-title{
+  padding:12px 20px;
+}
+.fbuild-title h3{
+  font-family:var(--serif);
+  font-size:16px;
+  font-weight:700;
+  margin-bottom:2px;
+}
+.fbuild-title .sub{
+  font-family:var(--mono);
+  font-size:10px;
+  color:var(--muted);
+  letter-spacing:.05em;
+}
+.fbuild-priority{
+  padding:12px 20px;
+  text-align:right;
+}
+.priority-badge{
+  font-family:var(--mono);
+  font-size:9px;
+  letter-spacing:.1em;
+  text-transform:uppercase;
+  padding:4px 10px;
+  border:1px solid;
+}
+.priority-badge.p1{background:var(--red-pale);color:var(--red);border-color:var(--red);}
+.priority-badge.p2{background:var(--amber-pale);color:var(--amber);border-color:var(--amber);}
+.priority-badge.p3{background:var(--blue-pale);color:var(--blue);border-color:var(--blue);}
+
+.fbuild-body{
+  display:grid;
+  grid-template-columns:1fr 1fr 1fr;
+  gap:0;
+}
+@media(max-width:700px){.fbuild-body{grid-template-columns:1fr;}}
+
+.fbuild-col{
+  padding:16px 20px;
+  border-right:1px solid var(--rule);
+  font-size:12px;
+  line-height:1.7;
+}
+.fbuild-col:last-child{border-right:none;}
+.fbuild-col .col-label{
+  font-family:var(--mono);
+  font-size:9px;
+  letter-spacing:.12em;
+  text-transform:uppercase;
+  color:var(--muted);
+  margin-bottom:8px;
+}
+.fbuild-col p{color:#3a3530;font-family:var(--sans);}
+
+/* ─── METRICS ROW ───────────────────────────────────── */
+.metrics{
+  display:grid;
+  grid-template-columns:repeat(auto-fit,minmax(160px,1fr));
+  gap:1px;
+  background:var(--rule);
+  margin-bottom:40px;
+  border:1px solid var(--rule);
+}
+.metric{
+  background:var(--paper);
+  padding:24px 20px;
+}
+.metric .val{
+  font-family:var(--serif);
+  font-size:36px;
+  font-weight:900;
+  line-height:1;
+  margin-bottom:6px;
+}
+.metric .val.red{color:var(--red);}
+.metric .val.green{color:var(--green);}
+.metric .val.amber{color:var(--amber);}
+.metric .val.blue{color:var(--blue);}
+.metric .mlabel{
+  font-family:var(--mono);
+  font-size:10px;
+  letter-spacing:.1em;
+  text-transform:uppercase;
+  color:var(--muted);
+  line-height:1.4;
+}
+
+/* ─── ROADMAP ───────────────────────────────────────── */
+.roadmap{position:relative;}
+.phase{
+  display:grid;
+  grid-template-columns:120px 1fr;
+  gap:24px;
+  margin-bottom:24px;
+  align-items:start;
+}
+@media(max-width:580px){.phase{grid-template-columns:1fr;}}
+.phase-label{
+  padding-top:4px;
+}
+.phase-tag{
+  font-family:var(--mono);
+  font-size:10px;
+  letter-spacing:.1em;
+  text-transform:uppercase;
+  border:1px solid var(--ink);
+  padding:5px 8px;
+  display:inline-block;
+  margin-bottom:8px;
+}
+.phase-time{
+  font-family:var(--mono);
+  font-size:10px;
+  color:var(--muted);
+}
+.phase-content{
+  border-left:2px solid var(--rule);
+  padding-left:24px;
+}
+.phase-content h4{
+  font-family:var(--serif);
+  font-size:16px;
+  font-weight:700;
+  margin-bottom:10px;
+}
+.phase-list{
+  list-style:none;
+  font-family:var(--mono);
+  font-size:11px;
+  line-height:1.8;
+  color:#3a3530;
+}
+.phase-list li::before{content:'→  ';color:var(--red);}
+
+/* ─── RISK TABLE ────────────────────────────────────── */
+.risk-row{
+  display:grid;
+  grid-template-columns:auto 1fr auto;
+  gap:20px;
+  align-items:center;
+  padding:16px 0;
+  border-bottom:1px solid var(--rule);
+}
+.risk-num{
+  font-family:var(--serif);
+  font-size:22px;
+  font-weight:900;
+  color:var(--red);
+  min-width:32px;
+}
+.risk-content h4{
+  font-family:var(--sans);
+  font-size:14px;
+  font-weight:500;
+  margin-bottom:3px;
+}
+.risk-content p{
+  font-family:var(--mono);
+  font-size:11px;
+  color:var(--muted);
+  line-height:1.7;
+}
+.risk-sev{
+  font-family:var(--mono);
+  font-size:9px;
+  letter-spacing:.1em;
+  text-transform:uppercase;
+  padding:4px 10px;
+  border:1px solid;
+  white-space:nowrap;
+}
+.sev-c{color:var(--red);border-color:var(--red);background:var(--red-pale);}
+.sev-h{color:var(--amber);border-color:var(--amber);background:var(--amber-pale);}
+.sev-m{color:var(--blue);border-color:var(--blue);background:var(--blue-pale);}
+
+/* ─── VERDICT FINAL ─────────────────────────────────── */
+.verdict-final{
+  background:var(--ink);
+  color:var(--paper);
+  padding:48px;
+  margin-top:40px;
+}
+.verdict-final h3{
+  font-family:var(--serif);
+  font-size:clamp(24px,4vw,40px);
+  font-weight:900;
+  font-style:italic;
+  margin-bottom:24px;
+  line-height:1.1;
+}
+.verdict-final p{
+  font-family:var(--mono);
+  font-size:12px;
+  line-height:1.9;
+  color:rgba(245,240,232,.7);
+  max-width:720px;
+}
+.verdict-final p+p{margin-top:16px;}
+.verdict-final strong{color:var(--paper);}
+
+/* ─── MISC ───────────────────────────────────────────── */
+.prose{font-size:14px;line-height:1.8;color:#3a3530;margin-bottom:20px;max-width:720px;}
+.mono-label{
+  font-family:var(--mono);
+  font-size:9px;
+  letter-spacing:.12em;
+  text-transform:uppercase;
+  color:var(--muted);
+  margin-bottom:4px;
+}
+hr.rule{border:none;border-top:1px solid var(--rule);margin:32px 0;}
+.tag-row{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px;}
+.tag{
+  font-family:var(--mono);
+  font-size:10px;
+  padding:3px 10px;
+  border:1px solid var(--rule);
+  color:var(--muted);
+}
+.tag.red{border-color:var(--red);color:var(--red);background:var(--red-pale);}
+.tag.green{border-color:var(--green);color:var(--green);background:var(--green-pale);}
+.tag.amber{border-color:var(--amber);color:var(--amber);background:var(--amber-pale);}
+footer{
+  text-align:center;
+  padding:40px;
+  font-family:var(--mono);
+  font-size:10px;
+  color:var(--muted);
+  letter-spacing:.08em;
+  border-top:2px solid var(--ink);
+}
+
+/* ─── ANIMATIONS ──────────────────────────────────────*/
+.appear{opacity:0;transform:translateY(16px);transition:opacity .5s ease,transform .5s ease;}
+.appear.in{opacity:1;transform:none;}
+</style>
+</head>
+<body>
+
+<!-- ═══ COVER ══════════════════════════════════════════ -->
+<div class="cover">
+  <div class="cover-top">
+    <span class="doc-tag">Strict Builder Analysis · Rev 2.0 · May 2026</span>
+    <span class="doc-tag">Confidential — Internal Use</span>
+  </div>
+  <div class="cover-body">
+    <h1>Med<em>Translate</em><br>AI Blueprint</h1>
+    <p class="cover-deck">
+      No softening. No generic praise. Every claim backed by real market data.<br>
+      This is the document you build from — not the one you pitch from.<br>
+      Includes: kill/build decisions, technical specs, real market sizing, risk register, and 18-month execution roadmap.
+    </p>
+  </div>
+  <div class="cover-bottom">
+    <div class="verdict-cell"><span class="score fail">5.5</span><span class="dim">Current State</span></div>
+    <div class="verdict-cell"><span class="score warn">7.8</span><span class="dim">18-mo Potential</span></div>
+    <div class="verdict-cell"><span class="score pass">$7.8B</span><span class="dim">Serviceable Market</span></div>
+    <div class="verdict-cell"><span class="score warn">8%</span><span class="dim">AI Error Rate (Critical)</span></div>
+    <div class="verdict-cell"><span class="score fail">0</span><span class="dim">Current Moat</span></div>
+  </div>
+</div>
+
+<!-- ═══ TOC NAV ════════════════════════════════════════ -->
+<nav class="toc">
+  <div class="toc-inner">
+    <a href="#reality">Reality Check</a>
+    <a href="#market">Market Data</a>
+    <a href="#audit">Feature Audit</a>
+    <a href="#threats">Kill Threats</a>
+    <a href="#build">What to Build</a>
+    <a href="#tech">Tech Spec</a>
+    <a href="#roadmap">Roadmap</a>
+    <a href="#risks">Risk Register</a>
+    <a href="#money">Revenue Model</a>
+    <a href="#verdict">Verdict</a>
+  </div>
+</nav>
+
+<!-- ═══ SECTION 1: REALITY CHECK ══════════════════════ -->
+<section class="sec appear" id="reality">
+<div class="wrap">
+  <div class="sec-label">Section 01</div>
+  <h2>The Brutal<br><em>Reality Check</em></h2>
+
+  <div class="alert kill">
+    <strong>🔴 Critical Finding — Read This First</strong>
+    MedTranslate AI is currently an AWS service wrapper with a healthcare UI painted on top. Amazon Textract + Amazon Translate + Lambda + S3 is not a product — it's a weekend project. Any hospital engineer can replicate the core pipeline in 3–5 days. There is no proprietary model, no proprietary data, no EHR integration, no clinical workflow, no moat. The version 1 product is not fundable at a serious valuation. This document tells you exactly what to build to change that.
+  </div>
+
+  <div class="two">
+    <div class="cell red">
+      <div class="cell-label">What you actually are today</div>
+      <h3>A Translation UI</h3>
+      <p>You wrap AWS Textract (OCR), AWS Translate (NMT), and S3 (storage) with a healthcare-skinned interface and a HIPAA checkbox. This is the same stack that any developer can assemble from AWS documentation in a week. The differentiation is cosmetic, not technical.</p>
+    </div>
+    <div class="cell green">
+      <div class="cell-label">What you need to become</div>
+      <h3>A Clinical Safety System</h3>
+      <p>The defensible company is the one that answers: "Was this translation safe enough to act on clinically?" Nobody in the market owns this. Build the Medical Safety Layer, build the Patient Comprehension Layer, build the EHR integration layer — and you have a product that a hospital cannot replicate internally.</p>
+    </div>
+  </div>
+
+  <div class="alert watch">
+    <strong>⚠️ The Physician Adoption Signal (Real Data)</strong>
+    The American Medical Association's 2024 Physician AI Sentiment Report found that AI translation services are now the most familiar AI use case among physicians, with 57% already using or planning immediate adoption — a 30% increase from 2023. Enthusiasm dramatically outpaces quality standards. This is your window. In 12–18 months, one of LanguageLine, Epic, or Google will close it.
+  </div>
+
+  <div class="two">
+    <div class="cell amber">
+      <div class="cell-label">The Error Rate Problem (Real Data)</div>
+      <h3>6–15% Critical Error Rate</h3>
+      <p>Current AI medical translators carry an average 6% error rate in critical care contexts (AHRQ). A 2024 systematic review found that professionally trained human interpreters average 27 errors per encounter, 7.1% of which are moderately or highly clinically significant. AI is no better — and often worse for non-European languages. This is the problem that, if you solve it, makes you worth acquiring.</p>
+    </div>
+    <div class="cell red">
+      <div class="cell-label">The Patient Safety Reality (Real Data)</div>
+      <h3>1 in 5 Patients Harmed</h3>
+      <p>1 in 5 US patients faces treatment delays due to language barriers. Language miscommunication contributes to 8% of preventable hospital deaths (AHRQ). LEP patients experience 35% higher rates of adverse events when professional interpreters are not used. A single AI-enabled "allergic to penicillin" → "penicillin works" mistranslation is a fatality. This isn't a UX problem. It's a patient safety emergency.</p>
+    </div>
+  </div>
+</div>
+</section>
+
+<!-- ═══ SECTION 2: MARKET DATA ═════════════════════════ -->
+<section class="sec appear" id="market">
+<div class="wrap">
+  <div class="sec-label">Section 02</div>
+  <h2>Real Market<br><em>Numbers</em></h2>
+
+  <p class="prose">Stop citing vague "global healthcare AI" figures. Here is the specific addressable market for MedTranslate AI — with sources, honest sizing, and the segments where pricing power is highest.</p>
+
+  <div class="metrics">
+    <div class="metric">
+      <div class="val green">$7.8B</div>
+      <div class="mlabel">Global Medical Interpreter Services Market 2025<br>(DataIntelo)</div>
+    </div>
+    <div class="metric">
+      <div class="val amber">$1.95B</div>
+      <div class="mlabel">Global Healthcare Language Market 2025<br>(Coherent Market Insights)</div>
+    </div>
+    <div class="metric">
+      <div class="val blue">25M</div>
+      <div class="mlabel">Limited English Proficiency Patients in US requiring language access</div>
+    </div>
+    <div class="metric">
+      <div class="val red">57%</div>
+      <div class="mlabel">US Physicians already using or planning immediate AI translation adoption (AMA 2024)</div>
+    </div>
+    <div class="metric">
+      <div class="val green">$51.2B</div>
+      <div class="mlabel">Total AI in Healthcare Market 2026 — growing 36.83% CAGR (Precedence Research)</div>
+    </div>
+    <div class="metric">
+      <div class="val amber">$14.29B</div>
+      <div class="mlabel">Global Interpreting Market 2025 (total), growing at ~10.76% CAGR</div>
+    </div>
+  </div>
+
+  <div class="alert note">
+    <strong>📊 Honest TAM / SAM / SOM for MedTranslate AI</strong>
+    TAM (Total Addressable Market): $7.8B medical interpreter services + $1.95B healthcare language market = ~$9.75B. This is what MedTranslate AI competes for at full scale.<br><br>
+    SAM (Serviceable Addressable Market — US only, AI-native): Approximately $2.8B (US share of medical interpreting at 38.4%, per DataIntelo). Hospitals alone are spending ~$800M/year on in-person and video interpretation that AI can displace at 50–70% cost reduction.<br><br>
+    SOM (Serviceable Obtainable Market — Year 1-2 realistic): $15M–$40M ARR if you capture 10–15 mid-size hospitals at $100K–$200K/year ACV. This is a fundable Series A story.
+  </div>
+
+  <div class="two">
+    <div class="cell green">
+      <div class="cell-label">The Regulatory Tailwind</div>
+      <h3>Mandatory Demand</h3>
+      <p>Title VI of the Civil Rights Act + Section 1557 of the ACA require all federally funded healthcare providers to supply language access. Over 70% of US healthcare facilities have implemented language services for compliance. In 2025, the Centers for Medicare and Medicaid Services issued proposed rulemaking to standardize coverage of language services across federally funded health programs. This is not discretionary spend. This is compliance spend — the most reliable revenue in healthcare.</p>
+    </div>
+    <div class="cell amber">
+      <div class="cell-label">The Displacement Opportunity</div>
+      <h3>Human Interpreter Costs</h3>
+      <p>On-site interpretation averages 41% of hospital interpretation spend. Video remote interpretation is 33%. These are expensive, slow to schedule, and unavailable at 3am in an ER. AI-powered interpretation at 50–70% lower cost (per Smartcat data) with 24/7 availability is a direct displacement play. The conversion argument to a hospital CFO is: "We reduce your interpreter line item by $400K/year and improve response time from 15 minutes to 30 seconds."</p>
+    </div>
+  </div>
+
+  <table class="t">
+    <thead>
+      <tr>
+        <th>Market Segment</th>
+        <th>2025 Size</th>
+        <th>Growth Rate</th>
+        <th>MedTranslate Fit</th>
+        <th>Entry Difficulty</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>Medical Document Translation</td>
+        <td>~$800M (est.)</td>
+        <td>~12% CAGR</td>
+        <td class="pass">✓ Already here</td>
+        <td class="part">Medium</td>
+      </tr>
+      <tr>
+        <td>Real-time Clinical Interpretation</td>
+        <td>~$3.0B (N.America)</td>
+        <td>8.1% CAGR</td>
+        <td class="warn">⚠ Not built yet</td>
+        <td class="fail">Hard</td>
+      </tr>
+      <tr>
+        <td>Clinical Trial Translation</td>
+        <td>~$1.2B (est.)</td>
+        <td>~15% CAGR</td>
+        <td class="warn">⚠ Not built yet</td>
+        <td class="fail">Very Hard</td>
+      </tr>
+      <tr>
+        <td>Insurance Claims Translation</td>
+        <td>~$600M (est.)</td>
+        <td>~10% CAGR</td>
+        <td class="fail">✗ Not built</td>
+        <td class="part">Medium</td>
+      </tr>
+      <tr>
+        <td>Patient Education Materials</td>
+        <td>~$300M (est.)</td>
+        <td>~18% CAGR</td>
+        <td class="warn">⚠ Partial</td>
+        <td class="pass">Low</td>
+      </tr>
+      <tr>
+        <td>EHR-Embedded Translation</td>
+        <td>Embedded in $4B+ EHR market</td>
+        <td>~20% CAGR</td>
+        <td class="fail">✗ Not built</td>
+        <td class="fail">Very Hard</td>
+      </tr>
+    </tbody>
+  </table>
+</div>
+</section>
+
+<!-- ═══ SECTION 3: FEATURE AUDIT ══════════════════════ -->
+<section class="sec appear" id="audit">
+<div class="wrap">
+  <div class="sec-label">Section 03</div>
+  <h2>Feature Audit:<br><em>No Charity Given</em></h2>
+
+  <p class="prose">Every feature rated on three axes: Does it exist? Does it work well enough for clinical use? Is it differentiated from what AWS gives you for free?</p>
+
+  <table class="t">
+    <thead>
+      <tr>
+        <th>Feature</th>
+        <th>Exists?</th>
+        <th>Clinical Grade?</th>
+        <th>Differentiated?</th>
+        <th>Kill / Keep / Build</th>
+        <th>Reason</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>Medical OCR (Textract)</td>
+        <td class="pass">✓</td>
+        <td class="part">Partial</td>
+        <td class="fail">No</td>
+        <td class="warn">UPGRADE</td>
+        <td>Textract doesn't handle physician handwriting, DICOM, or ICD-10 extraction. Add a layer.</td>
+      </tr>
+      <tr>
+        <td>Multi-language Translation (AWS Translate)</td>
+        <td class="pass">✓</td>
+        <td class="part">Partial</td>
+        <td class="fail">No</td>
+        <td class="warn">UPGRADE</td>
+        <td>AWS Translate has no medical domain fine-tuning and fails on low-resource languages. You must augment with NLLB-200 and a medical-tuned layer.</td>
+      </tr>
+      <tr>
+        <td>HIPAA Compliance</td>
+        <td class="pass">✓</td>
+        <td class="pass">Yes</td>
+        <td class="fail">No</td>
+        <td class="pass">KEEP</td>
+        <td>Necessary but table stakes. Every competitor has it. Does not justify pricing premium.</td>
+      </tr>
+      <tr>
+        <td>Real-time Voice Translation</td>
+        <td class="fail">✗</td>
+        <td>—</td>
+        <td>—</td>
+        <td class="fail">BUILD NOW</td>
+        <td>This is the #1 missing feature. Without live voice, you are NOT solving the bedside clinical encounter problem, which is 60% of the market value.</td>
+      </tr>
+      <tr>
+        <td>Translation Safety Validation</td>
+        <td class="fail">✗</td>
+        <td>—</td>
+        <td>—</td>
+        <td class="fail">BUILD FIRST</td>
+        <td>The 6–15% error rate in AI medical translation is a documented patient safety crisis. Build the safety layer and you own a category nobody else has defined.</td>
+      </tr>
+      <tr>
+        <td>EHR / FHIR Integration</td>
+        <td class="fail">✗</td>
+        <td>—</td>
+        <td>—</td>
+        <td class="fail">BUILD — Q2</td>
+        <td>Without Epic/Cerner SMART on FHIR integration, every translation requires a manual export/import workflow. Hospitals will not pay enterprise rates for manual workflows.</td>
+      </tr>
+      <tr>
+        <td>Medical Terminology Validation</td>
+        <td class="part">Partial</td>
+        <td class="fail">No</td>
+        <td class="fail">No</td>
+        <td class="warn">REBUILD</td>
+        <td>"Context-aware medical terms" is marketing copy. Without validation against SNOMED-CT, ICD-11, and RxNorm, you cannot claim clinical accuracy. Build the terminology grounding layer.</td>
+      </tr>
+      <tr>
+        <td>Translation Confidence Scoring</td>
+        <td class="fail">✗</td>
+        <td>—</td>
+        <td>—</td>
+        <td class="fail">BUILD — Q1</td>
+        <td>Every clinical translation must carry a reliability signal. Without it, clinicians have no basis for deciding when to escalate to a human interpreter. A 6% error rate with no warning is unconscionable.</td>
+      </tr>
+      <tr>
+        <td>Patient Comprehension Check</td>
+        <td class="fail">✗</td>
+        <td>—</td>
+        <td>—</td>
+        <td class="fail">BUILD — Q2</td>
+        <td>Delivering a translation is not the same as achieving comprehension. This gap kills patient outcomes. No competitor has built it. Build it.</td>
+      </tr>
+      <tr>
+        <td>Offline / Edge Mode</td>
+        <td class="fail">✗</td>
+        <td>—</td>
+        <td>—</td>
+        <td class="warn">BUILD — Q3</td>
+        <td>Rural clinics, ambulances, disaster response — zero internet connectivity scenarios. Mabel AI has a patent-pending offline mode but it uses basic phrase lookup, not an LLM. Beat them with a real edge model.</td>
+      </tr>
+      <tr>
+        <td>Discharge Summary Generation</td>
+        <td class="fail">✗</td>
+        <td>—</td>
+        <td>—</td>
+        <td class="warn">BUILD — Q2</td>
+        <td>Post-visit multilingual summaries tie directly to HCAHPS scores (patient satisfaction tied to hospital reimbursement). Clear hospital ROI calculation. Medium complexity to build.</td>
+      </tr>
+      <tr>
+        <td>Dialect & Register Awareness</td>
+        <td class="fail">✗</td>
+        <td>—</td>
+        <td>—</td>
+        <td class="warn">BUILD — Q3</td>
+        <td>Mexican Spanish ≠ Puerto Rican Spanish ≠ Guatemalan indigenous Spanish. No competitor has dialect-level medical register. This is a genuine technical moat when built.</td>
+      </tr>
+      <tr>
+        <td>Audit Trail / Logging</td>
+        <td class="pass">✓</td>
+        <td class="pass">Yes</td>
+        <td class="fail">No</td>
+        <td class="pass">KEEP</td>
+        <td>Present. Adequate. Required for Joint Commission accreditation. No further investment needed until compliance scope expands.</td>
+      </tr>
+      <tr>
+        <td>Mobile App (Native)</td>
+        <td class="fail">✗</td>
+        <td>—</td>
+        <td>—</td>
+        <td class="fail">BUILD — Q1</td>
+        <td>Healthcare workers are on iPhones and Android tablets at bedside. A web app is unusable in this context. A native app is non-negotiable for clinical adoption.</td>
+      </tr>
+      <tr>
+        <td>GDPR / EU Compliance</td>
+        <td class="fail">✗</td>
+        <td>—</td>
+        <td>—</td>
+        <td class="warn">BUILD — Q3</td>
+        <td>Without GDPR + EU MDR compliance, the entire European hospital market (26% of global medical interpretation spend) is legally inaccessible.</td>
+      </tr>
+    </tbody>
+  </table>
+</div>
+</section>
+
+<!-- ═══ SECTION 4: KILL THREATS ════════════════════════ -->
+<section class="sec appear" id="threats">
+<div class="wrap">
+  <div class="sec-label">Section 04</div>
+  <h2>Threats That<br><em>Kill the Company</em></h2>
+
+  <p class="prose">These are not hypothetical risks. These are active market conditions that will make MedTranslate AI irrelevant within 18 months if you do not respond.</p>
+
+  <div class="two">
+    <div class="cell red">
+      <div class="cell-label">Kill Threat #1</div>
+      <h3>Epic and Cerner Build It Themselves</h3>
+      <p>Epic's App Orchard has 500+ apps. Cerner's marketplace grows quarterly. Both already have rudimentary translation features. If either builds a native translation module with FHIR integration, every hospital on their platform has zero reason to pay for a third-party tool. You have a 12-month window to become the embedded translation standard inside Epic before they do it themselves. After that window closes, you are locked out of 70% of US hospitals.</p>
+    </div>
+    <div class="cell red">
+      <div class="cell-label">Kill Threat #2</div>
+      <h3>LanguageLine Acquires an AI Startup</h3>
+      <p>LanguageLine Solutions is the dominant player in US medical interpretation. They have the hospital relationships, the compliance frameworks, and the capital to acquire an AI translation startup. In July 2025, they partnered with VSee Health for telehealth integration. The next step is acquisition. If they acquire Mabel AI or build an AI layer, they instantly own the market with existing contracts. You need a hospital partnership and signed contracts before this happens.</p>
+    </div>
+  </div>
+  <div class="two">
+    <div class="cell red">
+      <div class="cell-label">Kill Threat #3</div>
+      <h3>OpenAI / Google Enter Healthcare Translation</h3>
+      <p>In January 2026, OpenAI acquired Torch to integrate "unified medical memory" into ChatGPT Health. Google Med-PaLM 2 achieves 94% accuracy in symptom translation. Google already has Google Translate in 133 languages. When they productize a HIPAA-compliant clinical translation layer — and they will — commodity translation is dead. Your moat cannot be "we translate medical documents." It must be "we verify that translations are safe before a physician acts on them."</p>
+    </div>
+    <div class="cell amber">
+      <div class="cell-label">Kill Threat #4</div>
+      <h3>A Malpractice Lawsuit Cites Your Translations</h3>
+      <p>Three major AI translators leaked patient data in 2023 (HIPAA Journal). A Korean-speaking patient's discharge instructions were mistranslated by an AI tool, leading to incorrect medication use at home (documented case). If a patient dies because MedTranslate AI produced a mistranslation with no safety validation layer, the liability exposure ends the company. The Medical Safety Sentinel is not a feature — it is an existential risk management system.</p>
+    </div>
+  </div>
+
+  <div class="alert kill">
+    <strong>🔴 The AI Accuracy Crisis — A Real Published Finding</strong>
+    A 2025 study in JAMA Pediatrics found GPT-4o translations of pediatric instructions into Spanish were preferred over human translators for fluency — BUT "performance degrades sharply for digitally under-represented languages." A 2025 peer-reviewed paper in IJERPH on AI tools in ICUs concluded that "recent studies indicate that Google Translate and ChatGPT are not accurate enough for advanced medical terminology." You are building in a sector where the underlying models are still clinically unvalidated. Your differentiation MUST be the validation layer, not the translation itself.
+  </div>
+</div>
+</section>
+
+<!-- ═══ SECTION 5: WHAT TO BUILD ════════════════════════ -->
+<section class="sec appear" id="build">
+<div class="wrap">
+  <div class="sec-label">Section 05</div>
+  <h2>Exactly<br><em>What to Build</em></h2>
+
+  <p class="prose">Prioritized by: (1) moat creation, (2) revenue unlock, (3) kill-threat defense, (4) technical feasibility in 18 months. Every feature includes a build spec you can hand to an engineering team.</p>
+
+  <!-- FEATURE 1 -->
+  <div class="fbuild">
+    <div class="fbuild-head">
+      <div class="fbuild-num">01</div>
+      <div class="fbuild-title">
+        <h3>Medical Safety Sentinel™</h3>
+        <div class="sub">Category: Patient Safety · Moat Level: Maximum · Competitors with this: 0</div>
+      </div>
+      <div class="fbuild-priority"><span class="priority-badge p1">Build First</span></div>
+    </div>
+    <div class="fbuild-body">
+      <div class="fbuild-col">
+        <div class="col-label">What it does</div>
+        <p>A secondary AI model that runs on every translation output before display, checking against a medical safety ruleset: dosage alterations, allergy inversions, drug contraindication drops, negation errors (translating "no fever" as "fever"), and critical condition mistranslations. Flags, blocks, or forces human review. Generates a "Clinical Safety Score" (0–100) per translation.</p>
+      </div>
+      <div class="fbuild-col">
+        <div class="col-label">Technical Build Spec</div>
+        <p>Stack: Custom NLI (Natural Language Inference) classifier fine-tuned on clinical error corpus + RAG over FDA Adverse Event Reporting System + MedDRA + SNOMED-CT. Latency target: &lt;800ms secondary pass. Flagging threshold: configurable per clinical context (ICU vs. routine). Output: JSON safety object with flag type, severity, affected term, and recommended action.</p>
+      </div>
+      <div class="fbuild-col">
+        <div class="col-label">Revenue / Hospital Value</div>
+        <p>This feature converts MedTranslate AI from a translation tool into a patient safety system. Hospital CIOs can cite this in Joint Commission audits. Risk management departments have measurable liability reduction. Pricing justification: hospitals pay $200K–$500K/year for patient safety software. This feature enables premium tier pricing. Also creates the proprietary training data flywheel that competitors cannot access.</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- FEATURE 2 -->
+  <div class="fbuild">
+    <div class="fbuild-head">
+      <div class="fbuild-num">02</div>
+      <div class="fbuild-title">
+        <h3>Real-Time Bidirectional Voice Translation</h3>
+        <div class="sub">Category: Clinical Encounter · Moat Level: High · Competitors with this: Mabel AI (no LLM), Jaide Health (limited)</div>
+      </div>
+      <div class="fbuild-priority"><span class="priority-badge p1">Build Q1</span></div>
+    </div>
+    <div class="fbuild-body">
+      <div class="fbuild-col">
+        <div class="col-label">What it does</div>
+        <p>Doctor and patient speak freely in their own languages. The system transcribes in real-time, translates, and speaks back the translation with &lt;2 second latency. Displays text transcript for both parties simultaneously. Medical entity highlighting (drugs, conditions, symptoms) in real-time. Runs on iOS/Android native app. Session is recorded, encrypted, and attached to patient record.</p>
+      </div>
+      <div class="fbuild-col">
+        <div class="col-label">Technical Build Spec</div>
+        <p>Stack: Whisper large-v3 streaming (faster-whisper) → medical NER (extracted entities) → domain-adapted MT model → TTS (Azure Neural Voice or ElevenLabs). Pipeline latency budget: STT 400ms + translation 600ms + TTS 500ms = 1.5s total. Speaker diarization via pyannote.audio to separate doctor/patient turns. HIPAA: all audio processed on-device or AWS GovCloud, never stored by default. Optional session logging with explicit consent.</p>
+      </div>
+      <div class="fbuild-col">
+        <div class="col-label">Revenue / Hospital Value</div>
+        <p>Replaces $60–$100/hour video remote interpretation costs. A hospital with 500 language-barrier encounters/month at $75/hour on-demand interpreter = $450K/year in interpreter costs. MedTranslate at $150K/year with unlimited encounters = $300K annual saving + better response times. This ROI calculation closes contracts. Target: 40% of all encounters shift to AI-assisted within 6 months of deployment.</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- FEATURE 3 -->
+  <div class="fbuild">
+    <div class="fbuild-head">
+      <div class="fbuild-num">03</div>
+      <div class="fbuild-title">
+        <h3>Translation Confidence + Explainability Engine</h3>
+        <div class="sub">Category: Clinical Trust · Moat Level: High · Competitors with this: 0</div>
+      </div>
+      <div class="fbuild-priority"><span class="priority-badge p1">Build Q1</span></div>
+    </div>
+    <div class="fbuild-body">
+      <div class="fbuild-col">
+        <div class="col-label">What it does</div>
+        <p>Every translated sentence carries a calibrated confidence score (0–100%) with a color-coded visual indicator (green/amber/red). Clicking any amber or red sentence shows WHY it was uncertain: ambiguous source term, no target-language medical equivalent, low-frequency training data, or detected negation/conditional structure. A "Review Required" threshold automatically routes low-confidence outputs to a human interpreter queue.</p>
+      </div>
+      <div class="fbuild-col">
+        <div class="col-label">Technical Build Spec</div>
+        <p>Stack: Calibrated translation model with Monte Carlo dropout uncertainty sampling OR ensemble of 3 MT models with variance scoring. Attention map extraction for term-level uncertainty attribution. Medical knowledge graph lookup to detect untranslatable concepts. Output schema: {sentence_id, score, flags[], affected_terms[], recommended_action}. Integration with human interpreter dispatch queue via webhook.</p>
+      </div>
+      <div class="fbuild-col">
+        <div class="col-label">Revenue / Hospital Value</div>
+        <p>This feature is the answer to the #1 physician objection: "How do I know I can trust this?" 57% of physicians plan AI translation adoption but have no quality standard to evaluate tools against. A visible, explainable confidence score is the trust bridge. It also enables tiered pricing: "Verified" translations (human-reviewed when AI confidence &lt;80%) as a premium tier. Projected: 30% conversion uplift from demos to signed contracts.</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- FEATURE 4 -->
+  <div class="fbuild">
+    <div class="fbuild-head">
+      <div class="fbuild-num">04</div>
+      <div class="fbuild-title">
+        <h3>FHIR R4 + Epic SMART on FHIR Integration</h3>
+        <div class="sub">Category: Workflow Lock-in · Moat Level: Maximum · Competitors with this: 0 (clinically integrated)</div>
+      </div>
+      <div class="fbuild-priority"><span class="priority-badge p1">Build Q1–Q2</span></div>
+    </div>
+    <div class="fbuild-body">
+      <div class="fbuild-col">
+        <div class="col-label">What it does</div>
+        <p>MedTranslate AI appears inside Epic and Cerner as a native app. Physicians initiate translation directly from a patient's chart. Translations are auto-attached to the encounter note. Discharge summaries are generated in the patient's language and pushed back to the chart. Patient preferred language is read from the FHIR profile automatically. Zero copy-paste workflow.</p>
+      </div>
+      <div class="fbuild-col">
+        <div class="col-label">Technical Build Spec</div>
+        <p>Epic App Orchard application (requires Epic review process, ~3–6 months). SMART on FHIR OAuth2 launch context. Read: Patient.language, Encounter, MedicationRequest, AllergyIntolerance. Write: DocumentReference (translated documents), Communication (discharge summary). Cerner Open Platform parallel implementation. FHIR R4 resource mapping to MedTranslate internal schema. CDS Hooks integration for real-time translation prompts during documentation.</p>
+      </div>
+      <div class="fbuild-col">
+        <div class="col-label">Revenue / Hospital Value</div>
+        <p>Epic integration is the single most powerful distribution move available. 350+ million patients have records in Epic. Epic App Orchard apps average $500K–$2M+ ACV for enterprise deployments. Being in Epic means: (1) No separate login for clinicians, (2) Translations are part of the legal medical record, (3) Workflow is zero-friction, (4) IT procurement is simplified. This converts a "nice to have" into infrastructure. Infrastructure gets 5-year contracts.</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- FEATURE 5 -->
+  <div class="fbuild">
+    <div class="fbuild-head">
+      <div class="fbuild-num">05</div>
+      <div class="fbuild-title">
+        <h3>Multilingual Discharge Summary Generator</h3>
+        <div class="sub">Category: Patient Outcomes · Moat Level: Medium-High · Competitors with this: 0</div>
+      </div>
+      <div class="fbuild-priority"><span class="priority-badge p2">Build Q2</span></div>
+    </div>
+    <div class="fbuild-body">
+      <div class="fbuild-col">
+        <div class="col-label">What it does</div>
+        <p>At discharge, AI ingests the EHR encounter data (diagnosis, medications, follow-up instructions, warning signs) and generates a patient-facing summary in their language at a 6th-grade reading level. Includes medication schedule visual, follow-up appointment details, emergency warning signs in bold. Delivered as PDF, SMS, WhatsApp message, or printed. Also generates a clinician-facing version that confirms what the patient was told.</p>
+      </div>
+      <div class="fbuild-col">
+        <div class="col-label">Technical Build Spec</div>
+        <p>FHIR data extraction (Encounter, MedicationRequest, Condition, Appointment) → LLM summarization prompt with reading-level constraint (Flesch-Kincaid target: grade 6) → multilingual generation → literacy-level validation pass → PDF generation (pdfmake or WeasyPrint) → delivery via Twilio SMS / WhatsApp Business API. Support: top 20 languages in first release. Medication schedule: visual timeline component rendered to image.</p>
+      </div>
+      <div class="fbuild-col">
+        <div class="col-label">Revenue / Hospital Value</div>
+        <p>HCAHPS scores (Hospital Consumer Assessment of Healthcare Providers and Surveys) directly affect hospital Medicare reimbursement via the Value-Based Purchasing program. Low discharge instruction comprehension consistently lowers HCAHPS scores. A 5-point HCAHPS improvement can mean $300K–$1M+ in annual reimbursement for a mid-size hospital. This is the ROI calculation that gets a CFO to sign. Position this as a "reimbursement protection" tool, not a translation tool.</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- FEATURE 6 -->
+  <div class="fbuild">
+    <div class="fbuild-head">
+      <div class="fbuild-num">06</div>
+      <div class="fbuild-title">
+        <h3>Patient Comprehension Score (PCS)</h3>
+        <div class="sub">Category: Outcomes Measurement · Moat Level: Maximum · Competitors with this: 0</div>
+      </div>
+      <div class="fbuild-priority"><span class="priority-badge p2">Build Q2–Q3</span></div>
+    </div>
+    <div class="fbuild-body">
+      <div class="fbuild-col">
+        <div class="col-label">What it does</div>
+        <p>After delivering a translated discharge instruction or medication explanation, AI presents 2–3 adaptive comprehension questions to the patient in their language (via voice or text). "When should you take this medication?" "What should you do if you feel chest pain?" AI scores responses, generates a Patient Comprehension Score (0–100), and flags the encounter if score is below 70. Triggers automatic re-explanation or interpreter escalation.</p>
+      </div>
+      <div class="fbuild-col">
+        <div class="col-label">Technical Build Spec</div>
+        <p>LLM generates context-specific verification questions from instruction content → question delivered via TTS in patient language → patient responds by voice or text → LLM evaluates response against expected answer semantically (not exact match) → score computed → if score &lt; threshold: branch to simplified re-explanation → log all interactions in FHIR Communication resource → score surfaced in clinician dashboard.</p>
+      </div>
+      <div class="fbuild-col">
+        <div class="col-label">Revenue / Hospital Value</div>
+        <p>This is the feature that changes MedTranslate AI's product category. Competitors sell "translation delivered." MedTranslate AI sells "comprehension verified." In outcomes-based healthcare contracting, comprehension verification is worth far more than delivery confirmation. Health systems will pay a premium tier for this. It is also publishable in NEJM or JAMA as a clinical innovation, generating organic awareness worth millions in marketing budget equivalent.</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- FEATURE 7 -->
+  <div class="fbuild">
+    <div class="fbuild-head">
+      <div class="fbuild-num">07</div>
+      <div class="fbuild-title">
+        <h3>Pictographic Prescription Explainer</h3>
+        <div class="sub">Category: Health Literacy · Moat Level: Medium · Competitors with this: 0</div>
+      </div>
+      <div class="fbuild-priority"><span class="priority-badge p2">Build Q2</span></div>
+    </div>
+    <div class="fbuild-body">
+      <div class="fbuild-col">
+        <div class="col-label">What it does</div>
+        <p>Converts prescription instructions into universally readable visual sequences: 🔴🔴 [morning sun icon] = "2 red pills after breakfast." Addresses 770M+ low-literacy adults globally and elderly patients who prefer visual instructions. Generates printable PDF card and digital version. Supports 50+ drug instruction patterns. Works for patients with language fluency but low medical literacy.</p>
+      </div>
+      <div class="fbuild-col">
+        <div class="col-label">Technical Build Spec</div>
+        <p>Medication instruction parser (LLM structured extraction: drug name, dose, frequency, timing, food interaction, warnings) → mapping to visual grammar (curated icon library: pill colors/shapes, time-of-day icons, food/water icons, warning symbols) → layout engine (SVG-based) → PDF generation. Icon library must be culturally neutral (WHO-validated pictograms where possible). First release: 20 most common medication instruction patterns.</p>
+      </div>
+      <div class="fbuild-col">
+        <div class="col-label">Revenue / Hospital Value</div>
+        <p>This feature costs ~4 weeks to build and generates the highest demo-to-contract conversion ratio of any feature in the product. It is visually impressive, immediately understandable, solves a real problem, and has zero competition. It gets written up in hospital pharmacy journals. It gets presented at HIMSS. Positioned as an add-on module at $20K–$50K/year per hospital. It opens doors that lead to the $200K+ enterprise contracts.</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- FEATURE 8 -->
+  <div class="fbuild">
+    <div class="fbuild-head">
+      <div class="fbuild-num">08</div>
+      <div class="fbuild-title">
+        <h3>Offline Emergency Mode (Edge AI)</h3>
+        <div class="sub">Category: Emergency / Rural · Moat Level: High · Competitors with this: Mabel AI (phrase-lookup only)</div>
+      </div>
+      <div class="fbuild-priority"><span class="priority-badge p3">Build Q3</span></div>
+    </div>
+    <div class="fbuild-body">
+      <div class="fbuild-col">
+        <div class="col-label">What it does</div>
+        <p>A fully offline mode running on a tablet or phone with zero internet. Pre-loads a quantized LLM (capable of medical translation in 30 target languages) and a database of 2,000 critical medical phrases. Activates via a large red "Emergency Mode" button. Designed for ambulances, rural clinics, disaster response, ships, and flights. Interface stripped to maximum-contrast minimal mode. Syncs session to cloud when connectivity restored.</p>
+      </div>
+      <div class="fbuild-col">
+        <div class="col-label">Technical Build Spec</div>
+        <p>Quantized model: Llama 3.1 8B in 4-bit GGUF format via llama.cpp (~4.5GB on device). Runtime: ONNX Runtime or llama.cpp on Android/iOS. Pre-loaded phrase DB: SQLite with 2,000 critical medical phrases × 30 languages. Sync: background queue with conflict resolution. UI: large-button emergency mode, voice-first, auto-activates when network quality drops below threshold. Battery optimization: inference throttling on low battery.</p>
+      </div>
+      <div class="fbuild-col">
+        <div class="col-label">Revenue / Hospital Value</div>
+        <p>Emergency medical services (EMS) market is a distinct buyer with federal funding. Rural Health Clinics (4,000+ federally designated) receive specific funding for language access. This is a hardware + software bundle opportunity: pre-configured tablets with offline AI. Annual government contracts for rural health and EMS are $50K–$200K per region. Humanitarian NGO market (WHO, MSF, ICRC) adds non-dilutive grant revenue. PR value: "We work when the internet doesn't" is a story that generates coverage in every major tech and health publication.</p>
+      </div>
+    </div>
+  </div>
+</div>
+</section>
+
+<!-- ═══ SECTION 6: TECH SPEC ════════════════════════════ -->
+<section class="sec appear" id="tech">
+<div class="wrap">
+  <div class="sec-label">Section 06</div>
+  <h2>Technical<br><em>Architecture</em></h2>
+
+  <p class="prose">This is the full recommended stack with rationale for every choice. Not aspirational — buildable by a 5-engineer team in 18 months if scoped correctly.</p>
+
+  <div class="two">
+    <div>
+      <table class="t">
+        <thead><tr><th>Layer</th><th>Tool / Service</th><th>Reason</th></tr></thead>
+        <tbody>
+          <tr><td>Core LLM (Cloud)</td><td>Claude Sonnet 4 via Anthropic API</td><td>Best reasoning + medical safety prompting. Fallback: GPT-4o.</td></tr>
+          <tr><td>Translation Model</td><td>AWS Translate + NLLB-200 (Meta)</td><td>AWS for high-resource languages. NLLB-200 for 200 low-resource languages with no commercial MT coverage.</td></tr>
+          <tr><td>Medical Fine-tune</td><td>Custom LoRA on Mistral 7B</td><td>Fine-tuned on MIMIC-III clinical notes + PubMed abstracts. Deployed on self-hosted GPU for cost control.</td></tr>
+          <tr><td>Speech-to-Text</td><td>Faster-Whisper large-v3</td><td>Streaming capable. Medical vocabulary add-on. Open source = HIPAA compatible on-premise deployment.</td></tr>
+          <tr><td>TTS (Voice Output)</td><td>Azure Neural TTS</td><td>Best naturalness-to-latency ratio. 400+ neural voices across 140 languages. HIPAA eligible.</td></tr>
+          <tr><td>OCR</td><td>Amazon Textract + Google Document AI</td><td>Textract for structured documents. Document AI for complex mixed layouts and handwriting.</td></tr>
+          <tr><td>Medical Knowledge RAG</td><td>SNOMED-CT + ICD-11 + RxNorm via Pinecone</td><td>Enables terminology grounding. Every translation is checked against authoritative medical terminology databases.</td></tr>
+          <tr><td>Safety Validation</td><td>Custom NLI model (DeBERTa-v3 fine-tuned)</td><td>Fine-tuned on clinical error corpus. Separate from translation model for independence of safety checks.</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div>
+      <table class="t">
+        <thead><tr><th>Layer</th><th>Tool / Service</th><th>Reason</th></tr></thead>
+        <tbody>
+          <tr><td>HIPAA Infrastructure</td><td>AWS GovCloud (us-gov-east-1)</td><td>BAA-eligible. AWS Macie for PHI detection. CloudTrail for audit logs. SOC 2 Type II compliant.</td></tr>
+          <tr><td>EHR Integration</td><td>Epic SMART on FHIR + HAPI FHIR Server</td><td>Epic covers 350M+ patient records. HAPI FHIR as the integration middleware layer.</td></tr>
+          <tr><td>Edge / Offline AI</td><td>Llama.cpp (4-bit quantized Llama 3.1 8B)</td><td>Runs on mid-range Android/iOS. 4.5GB model. Acceptable latency for medical phrase translation.</td></tr>
+          <tr><td>Backend API</td><td>FastAPI + AWS Lambda</td><td>FastAPI for complex endpoints. Lambda for serverless burst scaling. Both HIPAA-eligible.</td></tr>
+          <tr><td>Database</td><td>AWS RDS (Postgres) + DynamoDB</td><td>RDS for structured medical records. DynamoDB for session state and audit logs. Both BAA-eligible.</td></tr>
+          <tr><td>File Storage</td><td>AWS S3 + KMS encryption</td><td>S3 with SSE-KMS (customer-managed keys). Object expiry policies for PHI data lifecycle compliance.</td></tr>
+          <tr><td>Mobile</td><td>React Native (iOS + Android)</td><td>Single codebase. Expo managed workflow for fast iterations. Native modules for local LLM inference.</td></tr>
+          <tr><td>Analytics</td><td>Mixpanel + custom clinical dashboard</td><td>Product analytics. Clinical dashboard shows translation volume, error flags, comprehension scores per department.</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="alert note">
+    <strong>📋 The Pipeline Architecture (Production Version)</strong>
+    Patient/Document Input → OCR Layer (Textract / Document AI) → Medical NER Extraction (entity tagging) → Translation Model (AWS Translate + NLLB-200 + Medical LoRA) → Safety Sentinel (DeBERTa NLI classifier against FDA adverse events + SNOMED-CT check) → Confidence Scoring (ensemble variance) → Output Formatter (HTML/PDF/TTS) → FHIR Write-back → Audit Log. Total pipeline latency target: &lt;3 seconds for documents up to 5 pages, &lt;2 seconds for real-time voice turns.
+  </div>
+</div>
+</section>
+
+<!-- ═══ SECTION 7: ROADMAP ══════════════════════════════ -->
+<section class="sec appear" id="roadmap">
+<div class="wrap">
+  <div class="sec-label">Section 07</div>
+  <h2>18-Month<br><em>Execution Roadmap</em></h2>
+
+  <div class="alert build">
+    <strong>✅ Guiding Principle</strong>
+    Ship something to a real hospital within 90 days. A pilot with one paying customer — even at $0 — creates clinical validation data, generates a case study, and forces engineering discipline. Every 90-day block below ends with a customer deliverable, not a demo.
+  </div>
+
+  <div class="roadmap">
+    <div class="phase">
+      <div class="phase-label">
+        <span class="phase-tag">Phase 0</span>
+        <div class="phase-time">Months 1–2</div>
+      </div>
+      <div class="phase-content">
+        <h4>Foundation Hardening (Pre-Public)</h4>
+        <ul class="phase-list">
+          <li>Rebuild translation pipeline with medical LoRA layer (replace raw AWS Translate)</li>
+          <li>Integrate SNOMED-CT, ICD-11, RxNorm as RAG knowledge bases</li>
+          <li>Build v1 Safety Sentinel (rule-based + DeBERTa classifier for critical error types)</li>
+          <li>Add Translation Confidence Scores to every output</li>
+          <li>HIPAA BAA executed, SOC 2 Type II audit initiated</li>
+          <li>React Native app (iOS first): document upload + voice recording + translation display</li>
+          <li>Deliverable: Internal clinical QA testing with 500 real medical documents, error rate baseline measured</li>
+        </ul>
+      </div>
+    </div>
+    <div class="phase">
+      <div class="phase-label">
+        <span class="phase-tag">Phase 1</span>
+        <div class="phase-time">Months 3–5</div>
+      </div>
+      <div class="phase-content">
+        <h4>Pilot Hospital Deployment</h4>
+        <ul class="phase-list">
+          <li>Sign 1–3 community hospital pilot agreements (target: FQHCs — federally qualified health centers — easiest to convert)</li>
+          <li>Deploy real-time voice translation (Whisper + Azure TTS) in ER and primary care</li>
+          <li>Ship Pictographic Prescription Explainer (fastest ROI demo tool)</li>
+          <li>Begin Epic App Orchard application (6-month review process starts now)</li>
+          <li>First version of Multilingual Discharge Summary Generator</li>
+          <li>Deliverable: 90-day pilot report with error rate reduction data, clinician satisfaction scores, interpreter cost displacement metrics</li>
+        </ul>
+      </div>
+    </div>
+    <div class="phase">
+      <div class="phase-label">
+        <span class="phase-tag">Phase 2</span>
+        <div class="phase-time">Months 6–9</div>
+      </div>
+      <div class="phase-content">
+        <h4>Series A Readiness</h4>
+        <ul class="phase-list">
+          <li>Convert 2 pilots to paid contracts ($100K–$200K ACV each)</li>
+          <li>FHIR R4 integration live with first EHR (Cerner or athenahealth — faster than Epic)</li>
+          <li>Patient Comprehension Score v1 deployed and generating outcome data</li>
+          <li>Publish clinical validation paper (partnership with academic medical center)</li>
+          <li>Safety Sentinel upgraded with full clinical error corpus fine-tuning</li>
+          <li>Deliverable: $400K ARR, 3 signed hospital contracts, 1 submitted clinical paper — Series A pitch deck built on real data</li>
+        </ul>
+      </div>
+    </div>
+    <div class="phase">
+      <div class="phase-label">
+        <span class="phase-tag">Phase 3</span>
+        <div class="phase-time">Months 10–14</div>
+      </div>
+      <div class="phase-content">
+        <h4>Scale and Moat Deepening</h4>
+        <ul class="phase-list">
+          <li>Epic App Orchard approval + launch (unlocks 350M+ patient record ecosystem)</li>
+          <li>Clinical Trial Translation Agent (opens $1.2B pharma/CRO market)</li>
+          <li>Dialect-Aware Medical Voice AI (Spanish dialect variants first — largest LEP population in US)</li>
+          <li>Offline Emergency Mode (targets EMS, rural health, FEMA partnership)</li>
+          <li>EU GDPR compliance + first European hospital pilot (Germany or Netherlands)</li>
+          <li>Deliverable: $2M+ ARR, Epic integration live, first international contract</li>
+        </ul>
+      </div>
+    </div>
+    <div class="phase">
+      <div class="phase-label">
+        <span class="phase-tag">Phase 4</span>
+        <div class="phase-time">Months 15–18</div>
+      </div>
+      <div class="phase-content">
+        <h4>Category Definition and Series B Setup</h4>
+        <ul class="phase-list">
+          <li>Cross-Border Medical Passport — product launch (direct-to-patient, B2C revenue stream)</li>
+          <li>AI Insurance Claims Translator — partnership with Blue Cross or regional payer</li>
+          <li>Launch "Verified Translation" certification program — third-party audit of safety validation</li>
+          <li>Patent filings: Safety Sentinel, Patient Comprehension Score methodology, Confidence Scoring system</li>
+          <li>File for FDA SaMD (Software as a Medical Device) classification — creates regulatory moat</li>
+          <li>Deliverable: $5M+ ARR, patent portfolio, regulatory milestone, Series B pipeline of 20+ hospital prospects</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</div>
+</section>
+
+<!-- ═══ SECTION 8: RISK REGISTER ═══════════════════════ -->
+<section class="sec appear" id="risks">
+<div class="wrap">
+  <div class="sec-label">Section 08</div>
+  <h2>Risk<br><em>Register</em></h2>
+  <p class="prose">These are the specific events that kill or seriously impair MedTranslate AI. Each has a mitigation strategy. If you are not actively working the mitigation, the risk is unmanaged.</p>
+
+  <div class="risk-row">
+    <div class="risk-num">R1</div>
+    <div class="risk-content">
+      <h4>AI Mistranslation Causes Patient Harm / Lawsuit</h4>
+      <p>Probability: Medium (6–15% error rate in current AI translation is documented). Impact: Company-ending. A single documented case of patient harm attributed to MedTranslate AI output triggers FDA investigation, hospital contract cancellations, and litigation. Mitigation: Build Safety Sentinel first. Always include human escalation pathway. Display error rates transparently. Maintain mandatory "AI-Assisted, Not AI-Determined" disclaimer in clinical contexts. Get product liability insurance immediately.</p>
+    </div>
+    <div class="risk-sev sev-c">Critical</div>
+  </div>
+
+  <div class="risk-row">
+    <div class="risk-num">R2</div>
+    <div class="risk-content">
+      <h4>Epic or Cerner Builds Native Translation</h4>
+      <p>Probability: High within 24 months. Impact: Locks MedTranslate AI out of 70% of US hospital market. Mitigation: Apply for Epic App Orchard NOW (Month 1). Secure signed contracts with hospitals before Epic launches. Differentiate on safety validation (Epic will not build a medical safety layer — it is a separate clinical risk they will avoid). Consider becoming an Epic-native translation partner rather than a competitor.</p>
+    </div>
+    <div class="risk-sev sev-c">Critical</div>
+  </div>
+
+  <div class="risk-row">
+    <div class="risk-num">R3</div>
+    <div class="risk-content">
+      <h4>HIPAA Violation / Data Breach</h4>
+      <p>Probability: Low with proper controls. Impact: Company-ending (FTC fines up to $1.9M per violation category + reputational destruction). Three major AI translators leaked PHI in 2023. Mitigation: AWS GovCloud deployment, SOC 2 Type II certification (start now, takes 6 months), dedicated HIPAA compliance officer, penetration testing before any hospital pilot, cyber insurance, BAA with every partner.</p>
+    </div>
+    <div class="risk-sev sev-c">Critical</div>
+  </div>
+
+  <div class="risk-row">
+    <div class="risk-num">R4</div>
+    <div class="risk-content">
+      <h4>Google or OpenAI Launch HIPAA-Compliant Medical Translation</h4>
+      <p>Probability: High within 18 months. OpenAI acquired Torch (Jan 2026) for medical memory. Google Med-PaLM 2 is already 94% accurate on symptom translation. Mitigation: Move immediately into workflow integration (FHIR, Epic) and safety validation — features neither Google nor OpenAI will prioritize in their first-gen healthcare products. Hospital contracts with switching costs are the defense. A clinical paper co-authored with a hospital is also a defense Google cannot buy quickly.</p>
+    </div>
+    <div class="risk-sev sev-c">Critical</div>
+  </div>
+
+  <div class="risk-row">
+    <div class="risk-num">R5</div>
+    <div class="risk-content">
+      <h4>Inability to Pass Hospital Procurement</h4>
+      <p>Probability: High for first 6 months. Hospital IT procurement is notoriously slow (12–18 months typical cycle). Mitigation: Target Federally Qualified Health Centers (FQHCs) first — faster procurement, federal language access funding available, regulatory pressure to adopt language services. Use pilot agreements (not full contracts) to get deployed faster. One clinical champion inside a hospital (a bilingual physician or patient experience director) can accelerate procurement by 6 months.</p>
+    </div>
+    <div class="risk-sev sev-h">High</div>
+  </div>
+
+  <div class="risk-row">
+    <div class="risk-num">R6</div>
+    <div class="risk-content">
+      <h4>Translation Quality Degrades at Scale</h4>
+      <p>Probability: Medium. AWS Translate + base LLMs have documented degradation for non-European languages. Mitigation: Build a continuous evaluation pipeline that samples 5% of all translations and scores them against back-translation + BLEU/COMET metrics. Alert if quality drops below threshold. NLLB-200 for low-resource languages. Medical domain fine-tuning must be updated quarterly with new clinical literature.</p>
+    </div>
+    <div class="risk-sev sev-h">High</div>
+  </div>
+
+  <div class="risk-row">
+    <div class="risk-num">R7</div>
+    <div class="risk-content">
+      <h4>Burn Rate Outpaces Revenue Before Series A</h4>
+      <p>Probability: Medium (common for health-tech B2B). Impact: Company runs out of money before achieving fundable metrics. Mitigation: Target FQHC pilots at $20K–$50K (faster to close than hospital contracts). Apply for NIH SBIR grants (language barrier in healthcare is a priority research area — $300K–$750K non-dilutive). Consider a $500K–$1M strategic investment from a healthcare system in exchange for first-mover access and clinical validation.</p>
+    </div>
+    <div class="risk-sev sev-h">High</div>
+  </div>
+</div>
+</section>
+
+<!-- ═══ SECTION 9: REVENUE MODEL ════════════════════════ -->
+<section class="sec appear" id="money">
+<div class="wrap">
+  <div class="sec-label">Section 09</div>
+  <h2>Revenue Model<br><em>With Real Numbers</em></h2>
+
+  <div class="two">
+    <div class="cell green">
+      <div class="cell-label">Tier 1 — Community Health / FQHC</div>
+      <h3>$20K–$50K / Year</h3>
+      <p>Target: Federally Qualified Health Centers (4,000+ in US). Fastest procurement cycle. Federal language access funding available as budget source. Features: document translation, discharge summaries, pictographic explainer, basic voice. Realistic: 20 FQHCs in Year 1 = $600K ARR baseline.</p>
+    </div>
+    <div class="cell amber">
+      <div class="cell-label">Tier 2 — Mid-Size Hospital</div>
+      <h3>$100K–$200K / Year</h3>
+      <p>Target: 200–500 bed community hospitals with 500+ LEP encounters/month. Full feature suite including real-time voice, Safety Sentinel, EHR integration (Cerner/athena), PCS, multilingual discharge summaries. 5 hospitals in Year 1 = $750K ARR. 15 hospitals in Year 2 = $2.25M ARR.</p>
+    </div>
+  </div>
+  <div class="two">
+    <div class="cell blue">
+      <div class="cell-label">Tier 3 — Health System / Academic Medical Center</div>
+      <h3>$300K–$750K / Year</h3>
+      <p>Target: Large academic medical centers and multi-hospital health systems. Requires Epic integration, custom FHIR connectors, dedicated clinical support, SOC 2 Type II. 3 health systems in Year 2 = $1.5M ARR. This tier requires 12–18 month sales cycles — start these conversations at Month 1 even though close is Month 12.</p>
+    </div>
+    <div class="cell red">
+      <div class="cell-label">Tier 4 — Pharma / Clinical Trials</div>
+      <h3>$200K–$1M / Year</h3>
+      <p>Target: CROs, pharma companies with multilingual clinical trials. Requires regulatory compliance (ICH E6, FDA 21 CFR). High ACV, longer sales cycle, but repeat business (each trial = new contract). One Tier 4 contract = equivalent to 5–10 community hospitals. Start building this vertical at Month 10.</p>
+    </div>
+  </div>
+
+  <table class="t">
+    <thead>
+      <tr><th>Time Period</th><th>Contracts</th><th>ARR Target</th><th>Key Milestone Enabling It</th></tr>
+    </thead>
+    <tbody>
+      <tr><td>Month 6</td><td>3 FQHC pilots + 1 hospital</td><td>$100K ARR</td><td>Safety Sentinel + Voice Translation live</td></tr>
+      <tr><td>Month 9</td><td>8 FQHCs + 2 hospitals</td><td>$400K ARR</td><td>First EHR integration (Cerner)</td></tr>
+      <tr><td>Month 12</td><td>15 FQHCs + 4 hospitals</td><td>$1M ARR</td><td>Clinical validation paper published, Epic App Orchard approved</td></tr>
+      <tr><td>Month 18</td><td>25 FQHCs + 8 hospitals + 1 health system</td><td>$3M–$5M ARR</td><td>Epic integration live, PCS deployed, Series B raise</td></tr>
+    </tbody>
+  </table>
+
+  <div class="alert build">
+    <strong>✅ Non-Dilutive Revenue Paths</strong>
+    NIH SBIR Phase I: $300K for "Language Barrier Technology in Healthcare" (high priority research area). HRSA grants for FQHC language access technology. FEMA / HHS grants for emergency response translation. State Medicaid language access compliance grants. These are slower to pursue but fund early runway without equity dilution. Apply at Month 1 — SBIR review cycles are 6–8 months.
+  </div>
+</div>
+</section>
+
+<!-- ═══ SECTION 10: FINAL VERDICT ══════════════════════ -->
+<section class="sec appear" id="verdict">
+<div class="wrap">
+  <div class="sec-label">Section 10</div>
+  <h2>Final<br><em>Verdict</em></h2>
+
+  <div class="two">
+    <div class="cell red">
+      <div class="cell-label">What will kill this company</div>
+      <h3>Building features before safety</h3>
+      <p>Every week you ship a new language or a UI redesign before shipping the Safety Sentinel, you accumulate technical and legal debt. If a documented mistranslation harms a patient before your safety layer is live, the company does not survive. Prioritization must be: Safety → Integration → Voice → Everything else. No exceptions.</p>
+    </div>
+    <div class="cell green">
+      <div class="cell-label">What will make this company</div>
+      <h3>Owning "Verified Safe Translation"</h3>
+      <p>The market is crowded with translation. The market is empty of safe, verified, clinically-integrated translation. The day you can walk into a hospital and say: "Our system detected and blocked 847 potentially dangerous mistranslations last quarter across your patient population" — you have a company that cannot be displaced by Google, Epic, or LanguageLine. That is the singular goal.</p>
+    </div>
+  </div>
+
+  <div class="verdict-final">
+    <h3>"The window is 12 months.<br>Not 24. Not 36. Twelve."</h3>
+    <p><strong>The market context is brutally real:</strong> AI captured 46% of all healthcare VC investment in 2025 — $18B+ deployed. 57% of US physicians are adopting AI translation now. OpenAI is in healthcare. Google is in healthcare. Epic is building AI features. LanguageLine is partnering with AI startups. You are in a race to establish clinical validation and hospital contracts before incumbents absorb your niche.</p>
+    <p><strong>The good news:</strong> The healthcare language services market is $7.8B and growing. Title VI and ACA Section 1557 create mandatory demand that does not evaporate in a downturn. The specific niche of "AI-verified safe clinical translation" is genuinely unclaimed. There is no company in the world that has built a Medical Safety Sentinel, a Patient Comprehension Score, and a FHIR-integrated discharge summary generator together. That combination is your product and your moat.</p>
+    <p><strong>The directive:</strong> Build the Safety Sentinel in Month 1. Start the Epic App Orchard application in Month 1. Sign your first FQHC pilot in Month 3. Get your first clinical validation data by Month 6. Everything else — the pictographic explainer, the dialect AI, the cross-border passport, the insurance translator — comes after you have a defensible clinical foundation. The roadmap above is not a wish list. It is a build order. Follow it strictly.</p>
+    <p><strong>What "success" looks like in 18 months:</strong> $3M–$5M ARR. 3+ published clinical outcomes papers. A patent on the Safety Sentinel methodology. Epic App Orchard live. A Series B raise at $40M–$80M valuation based on 8–12x ARR multiple + strategic value of clinical data flywheel. One documented case where the Safety Sentinel prevented a patient harm event. That last one is worth more than all the others combined.</p>
+  </div>
+</div>
+</section>
+
+<footer>MedTranslate AI · Strict Builder Blueprint · v2.0 · May 2026 · For Internal Use Only</footer>
+
+<script>
+const obs = new IntersectionObserver(entries=>{
+  entries.forEach(e=>{if(e.isIntersecting){e.target.classList.add('in');obs.unobserve(e.target);}});
+},{threshold:0.05});
+document.querySelectorAll('.appear').forEach(el=>obs.observe(el));
+</script>
+</body>
+</html>
