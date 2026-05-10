@@ -110,7 +110,8 @@ Respond with ONLY a single valid JSON object — no markdown fences, no preamble
     "reason_for_visit": "string or null",
     "hospital_course": "string or null — plain English what happened",
     "discharge_medications": [{"name": "string", "instructions": "string", "purpose": "string", "schedule_codes": ["array of exact strings: 'morning', 'afternoon', 'night', 'food', 'water', '1x', '2x', '3x' — omit if none apply"]}],
-    "follow_up_appointments": [{"who": "string", "when": "string", "purpose": "string"}]
+    "follow_up_appointments": [{"who": "string", "when": "string", "purpose": "string"}],
+    "comprehension_questions": ["1-2 simple questions to ask the patient to verify they understood their medications or instructions"]
   },
   "doctor_questions": ["3-5 plain English questions to ask the doctor"],
   "watch_for_symptoms": [{"symptom": "string", "reason": "string"}],
@@ -592,9 +593,10 @@ Follow-up Appointments:
       <Nav lang={lang} setLang={setLang} highContrast={hc} setHighContrast={setHighContrast} fontSize={fontSize} setFontSize={setFontSize} showReset={page === "results"} onReset={reset} translating={translating} />
 
       <main style={{ position: "relative", zIndex: 1 }}>
-        {page === "home" && <HomePage selectedFile={selectedFile} setFile={setFile} reportText={reportText} setReportText={setReportText} inputMode={inputMode} setInputMode={setInputMode} dragOver={dragOver} setDragOver={setDragOver} analyzing={analyzing} analyzingStep={analyzingStep} error={error} setError={setError} fileRef={fileRef} handleDrop={handleDrop} analyze={analyze} highContrast={hc} onStartVoice={() => setPage("voice")} onEpicLogin={handleEpicLogin} />}
-        {page === "results" && <ResultsPage r={display} safetyData={safetyData} tab={tab} setTab={setTab} chatMsgs={chatMsgs} chatInput={chatInput} setChatInput={setChatInput} chatLoading={chatLoading} sendChat={sendChat} chatEndRef={chatEndRef} chatPdf={chatPdf} setChatPdf={setChatPdf} chatPdfRef={chatPdfRef} detectedLang={detectedLang} setDetectedLang={setDetected} copied={copied} copyText={copyText} highContrast={hc} translating={translating} />}
+        {page === "home" && <HomePage selectedFile={selectedFile} setFile={setFile} reportText={reportText} setReportText={setReportText} inputMode={inputMode} setInputMode={setInputMode} dragOver={dragOver} setDragOver={setDragOver} analyzing={analyzing} analyzingStep={analyzingStep} error={error} setError={setError} fileRef={fileRef} handleDrop={handleDrop} analyze={analyze} highContrast={hc} onStartVoice={() => setPage("voice")} onEpicLogin={handleEpicLogin} onOfflineMode={() => setPage("offline")} />}
+        {page === "results" && <ResultsPage r={display} safetyData={safetyData} tab={tab} setTab={setTab} chatMsgs={chatMsgs} chatInput={chatInput} setChatInput={setChatInput} chatLoading={chatLoading} sendChat={sendChat} chatEndRef={chatEndRef} chatPdf={chatPdf} setChatPdf={setChatPdf} chatPdfRef={chatPdfRef} detectedLang={detectedLang} setDetectedLang={setDetectedLang} copied={copied} copyText={copyText} highContrast={hc} translating={translating} />}
         {page === "voice" && <VoicePage lang={lang} highContrast={hc} onExit={() => setPage("home")} />}
+        {page === "offline" && <OfflinePage lang={lang} highContrast={hc} onExit={() => setPage("home")} />}
       </main>
     </div>
   );
@@ -650,7 +652,7 @@ function Nav({ lang, setLang, highContrast, setHighContrast, fontSize, setFontSi
 // ─────────────────────────────────────────────────────────────
 // HOME PAGE
 // ─────────────────────────────────────────────────────────────
-function HomePage({ selectedFile, setFile, reportText, setReportText, inputMode, setInputMode, dragOver, setDragOver, analyzing, analyzingStep, error, setError, fileRef, handleDrop, analyze, highContrast, onStartVoice, onEpicLogin }) {
+function HomePage({ selectedFile, setFile, reportText, setReportText, inputMode, setInputMode, dragOver, setDragOver, analyzing, analyzingStep, error, setError, fileRef, handleDrop, analyze, highContrast, onStartVoice, onEpicLogin, onOfflineMode }) {
   const hc = highContrast;
   const steps = [
     { num:1, icon:"📤", title:"Upload or paste your report",  desc:"PDF, photo, or copy-paste text — all work" },
@@ -752,11 +754,18 @@ function HomePage({ selectedFile, setFile, reportText, setReportText, inputMode,
         <span style={{ color: "#6366f1", fontWeight: 600 }}>📑 PDF · 🖼️ Image · 📝 Pasted text — all accepted</span>
       </p>
 
-      <div className="fu6" style={{ marginTop: 24, textAlign: "center" }}>
-        <div style={{ background: hc ? "#111" : "rgba(34,197,94,0.06)", border: `1px solid ${hc ? "#444" : "rgba(34,197,94,0.2)"}`, borderRadius: 16, padding: "20px" }}>
+      <div className="fu6" style={{ marginTop: 24, textAlign: "center", display: "flex", gap: 16, justifyContent: "center", flexWrap: "wrap" }}>
+        <div style={{ background: hc ? "#111" : "rgba(34,197,94,0.06)", border: `1px solid ${hc ? "#444" : "rgba(34,197,94,0.2)"}`, borderRadius: 16, padding: "20px", flex: "1 1 300px" }}>
           <div style={{ fontSize: 13, fontWeight: 700, color: hc ? "#fff" : "#16a34a", marginBottom: 6 }}>Talking to your doctor right now?</div>
           <button onClick={onStartVoice} style={{ background: "#22c55e", color: "#fff", border: "none", borderRadius: 12, padding: "12px 24px", fontSize: 14, fontWeight: 700, cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 8, boxShadow: "0 4px 14px rgba(34,197,94,0.3)", transition: "transform 0.2s" }} onMouseOver={e=>e.currentTarget.style.transform="scale(1.02)"} onMouseOut={e=>e.currentTarget.style.transform="scale(1)"}>
             🎙️ Start Live Voice Translation
+          </button>
+        </div>
+
+        <div style={{ background: hc ? "#111" : "rgba(239,68,68,0.06)", border: `1px solid ${hc ? "#444" : "rgba(239,68,68,0.2)"}`, borderRadius: 16, padding: "20px", flex: "1 1 300px" }}>
+          <div style={{ fontSize: 13, fontWeight: 700, color: hc ? "#fff" : "#dc2626", marginBottom: 6 }}>No internet connection?</div>
+          <button onClick={onOfflineMode} style={{ background: "#dc2626", color: "#fff", border: "none", borderRadius: 12, padding: "12px 24px", fontSize: 14, fontWeight: 700, cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 8, boxShadow: "0 4px 14px rgba(239,68,68,0.3)", transition: "transform 0.2s" }} onMouseOver={e=>e.currentTarget.style.transform="scale(1.02)"} onMouseOut={e=>e.currentTarget.style.transform="scale(1)"}>
+            🚨 Offline Emergency Mode
           </button>
         </div>
       </div>
@@ -1274,6 +1283,33 @@ function renderPictograms(codes) {
 // ─────────────────────────────────────────────────────────────
 function DischargePanel({ ds, translating, highContrast }) {
   const hc = highContrast;
+  const [pcsScore, setPcsScore] = useState(null);
+  const [pcsEvaluating, setPcsEvaluating] = useState(false);
+  const [pcsAnswers, setPcsAnswers] = useState({});
+
+  const evaluatePCS = async () => {
+    if (!ds.comprehension_questions) return;
+    setPcsEvaluating(true);
+    const answersText = ds.comprehension_questions.map((q, i) => `Q: ${q}\nA: ${pcsAnswers[i] || "No answer"}`).join("\n\n");
+    const prompt = `You are evaluating a patient's comprehension of their discharge summary.
+    
+Discharge Summary Context:
+${JSON.stringify(ds, null, 2)}
+
+Patient's Answers:
+${answersText}
+
+Evaluate if the patient understood the critical instructions. 
+Respond ONLY with a JSON object: {"score": <number 0-100>, "feedback": "<1-2 sentences of encouraging feedback or correction>"}`;
+
+    try {
+      const res = await callGroq([{role: "user", content: prompt}], "You evaluate patient comprehension. Output ONLY valid JSON.");
+      const data = JSON.parse(res.replace(/```json|```/g, "").trim());
+      setPcsScore(data);
+    } catch(e) { console.error(e); }
+    setPcsEvaluating(false);
+  };
+
   if (!ds) return null;
   return (
     <div className="scale-in">
@@ -1323,6 +1359,34 @@ function DischargePanel({ ds, translating, highContrast }) {
               </div>
             ))}
           </div>
+        </div>
+      )}
+
+      {ds.comprehension_questions && ds.comprehension_questions.length > 0 && !translating && (
+        <div style={{ marginTop: 30, background: hc ? "#1a2a1a" : "rgba(34,197,94,0.06)", border: `1px solid ${hc ? "#242" : "rgba(34,197,94,0.3)"}`, borderRadius: 16, padding: "20px" }}>
+          <h3 style={{ fontSize: 16, color: hc ? "#fff" : "#16a34a", marginBottom: 12, display: "flex", alignItems: "center", gap: 8 }}><span>🧠</span> Verify Understanding (PCS)</h3>
+          <p style={{ fontSize: 13, color: hc ? "#bbb" : "#475569", marginBottom: 16 }}>Please answer these questions to ensure you understood the instructions:</p>
+          <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+            {ds.comprehension_questions.map((q, i) => (
+              <div key={i}>
+                <div style={{ fontWeight: 600, fontSize: 14, color: hc ? "#ddd" : "#1a1a2e", marginBottom: 8 }}>{q}</div>
+                <input type="text" value={pcsAnswers[i] || ""} onChange={e => setPcsAnswers({...pcsAnswers, [i]: e.target.value})} placeholder="Type your answer..." disabled={pcsScore} style={{ width: "100%", padding: "12px", borderRadius: 8, border: `1px solid ${hc ? "#444" : "#cbd5e1"}`, background: hc ? "#111" : "#fff", color: hc ? "#fff" : "#1a1a2e", fontSize: 14 }} />
+              </div>
+            ))}
+          </div>
+          {!pcsScore ? (
+            <button onClick={evaluatePCS} disabled={pcsEvaluating || Object.keys(pcsAnswers).length === 0} style={{ marginTop: 16, width: "100%", background: "#22c55e", color: "#fff", border: "none", borderRadius: 10, padding: "12px", fontWeight: 700, cursor: pcsEvaluating ? "wait" : "pointer", opacity: (pcsEvaluating || Object.keys(pcsAnswers).length === 0) ? 0.6 : 1 }}>
+              {pcsEvaluating ? "Evaluating..." : "Check My Answers"}
+            </button>
+          ) : (
+            <div style={{ marginTop: 20, padding: "16px", borderRadius: 10, background: pcsScore.score >= 70 ? "rgba(34,197,94,0.1)" : "rgba(239,68,68,0.1)", border: `1px solid ${pcsScore.score >= 70 ? "#22c55e" : "#ef4444"}` }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 8 }}>
+                <span style={{ fontSize: 24 }}>{pcsScore.score >= 70 ? "✅" : "⚠️"}</span>
+                <span style={{ fontWeight: 700, fontSize: 18, color: pcsScore.score >= 70 ? "#16a34a" : "#dc2626" }}>Score: {pcsScore.score}/100</span>
+              </div>
+              <div style={{ color: hc ? "#eee" : "#1a1a2e", fontSize: 14, lineHeight: 1.6 }}>{pcsScore.feedback}</div>
+            </div>
+          )}
         </div>
       )}
     </div>
